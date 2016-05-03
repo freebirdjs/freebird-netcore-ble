@@ -1,0 +1,62 @@
+{
+    "public": {
+        "generic": {
+            "0x2A72": "apparentWindSpeed", 
+            "0x2A35": "bloodPressureMeas", 
+            "0x2A9C": "bodyComposMeas",    
+            "0x2AA7": "cgmMeas",           
+            "0x2A5B": "cscMeas",           
+            "0x2A18": "glucoseMeas",       
+            "0x2A37": "heartrateMeas",     
+            "0x2A5F": "plxContMeas",       
+            "0x2A5E": "plxSpotCheckMeas",  
+            "0x2A6D": "pressure",          
+            "0X2A92": "restingHeartRate",  
+            "0x2A53": "rscMeas",           
+            "0x2A98": "weight",            
+            "0x2A9D": "weightMeas",        
+            "0x2A8E": "height"              
+        },
+        "temperature": {
+            "0x2A6E": "temperature",       
+            "0x2A1C": "tempMeas",          
+            "0x2A1E": "imediateTemp"       
+        },
+        "humidity": {
+            "0x2A6F": "humidity"  
+        },
+        "pwrMea": {
+            "0x2A19": "battLevel",
+            "0x2A07": "txPwrLevel",
+            "0x2A63": "cycPwrMeas"
+        },
+        "magnetometer": {
+            "0x2A2C": "magDec",
+            "0x2AA0": "magFluxDensity2D",
+            "0x2AA1": "magFluxDensity3D"
+        }
+    },
+    "sivann": {
+        "dIn": "0xcc00",
+        "dOut": "0xcc01",
+        "aIn": "0xcc02",
+        "aOut": "0xcc03",
+        "generic": "0xcc04",
+        "illuminance": "0xcc05",
+        "presence": "0xcc06",
+        "temperature": "0xcc07",
+        "humidity": "0xcc08",
+        "pwrMea": "0xcc09",
+        "actuation": "0xcc0a",
+        "setPoint": "0xcc0b",
+        "loadCtrl": "0xcc0c",
+        "lightCtrl": "0xcc0d",
+        "pwrCtrl": "0xcc0e",
+        "accelerometer": "0xcc0f",
+        "magnetometer": "0xcc10",
+        "barometer": "0xcc11"
+    },
+    "ti": {
+
+    }
+}
