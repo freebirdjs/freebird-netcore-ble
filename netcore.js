@@ -1,78 +1,120 @@
 var _ = require('lodash'),
-    central = require('ble-shepherd'),
+    fs = require('fs'),
+    bShepherd = require('ble-shepherd'),
     fbBase = require('freebird-base'),
     Netcore = fbBase.Netcore;
 
-var gadDefs = JSON.parse(fs.readFileSync(__dirname + '/defs.json'));
+var uuidDefs = JSON.parse(fs.readFileSync(__dirname + '/defs.json'));
     
-var nc = new Netcore('blecore', central, {phy: null, nwk: null}),
+var nc,
+    central,
     netDrvs = {},
     devDrvs = {},
     gadDrvs = {};
 
-var publicUuids = [],
-    tiUuids = [],
-    sivannUuids = [];
+var nspUuids = {
+        public: [],
+        sivann: [],
+        ti: []
+    },
+    ipsoDefs = {
+        dIn: [],
+        dOut: [],
+        aIn: [],
+        aOut: [],
+        generic: [],
+        illuminance: [],
+        presence: [],
+        temperature: [],
+        humidity: [],
+        pwrMea: [],
+        actuation: [],
+        setPoint: [],
+        loadCtrl: [],
+        lightCtrl: [],
+        pwrCtrl: [],
+        accelerometer: [],
+        magnetometer: [],
+        barometer: []
+    },
+    reportCfgTable = {};
 
-gadDefs.public.forEach(function (uuids) {
-    publicUuids = publicUuids.concat(uuids.keys());
+var bleNc = function (chipName) {
+    central = bShepherd(chipName);
+    central.on('IND', shepherdEvtHdlr);
+
+    nc = new Netcore('blecore', central, {phy: 'ble', nwk: 'ble'});
+    nc.cookRawDev = cookRawDev;
+    nc.cookRawGad = cookRawGad;
+
+    nc.registerNetDrivers(netDrvs);
+    nc.registerDevDrivers(devDrvs);
+    nc.registerGadDrivers(gadDrvs);
+
+    return nc;
+};
+
+/*************************************************************************************************/
+/*** Initialize Definitions                                                                    ***/
+/*************************************************************************************************/
+_.forEach(uuidDefs, function (uuidSet, nsp) {
+    _.forEach(uuidSet, function (uuids) {
+        nspUuids[nsp] = nspUuids[nsp].concat(uuids);
+    });
+
+    _.forEach(ipsoDefs, function (uuids, name) {
+        if (uuidSet[name])
+            ipsoDefs[name] = ipsoDefs[name].concat(uuidSet[name]);
+    });
 });
-
-gadDefs.ti.forEach(function (uuids) {
-    tiUuids = tiUuids.concat(uuids.keys());
-});
-
-gadDefs.sivann.forEach(function (uuid) {
-    sivannUuids.push(uuid);
-});
-
 
 /*************************************************************************************************/
 /*** Shepherd Event Handlers                                                                   ***/
 /*************************************************************************************************/
-central.on('IND', function (msg) {
-    var dev,
+function shepherdEvtHdlr (msg) {
+    var data = msg.data,
+        dev,
         manuName,
         chars = [];
 
     switch (msg.type) {
         case 'DEV_INCOMING':
-            dev = central.find(msg.data);
+            dev = central.find(data);
             manuName = dev.servs['0x180a'].chars['0x2a29'].val.manufacturerName;
-            nc.commitDevIncoming(msg.data, dev);
+            nc.commitDevIncoming(data, dev);
 
             dev.servs.forEach(function (serv) {
                 chars = chars.concat(serv.chars);
             });
 
-            commitGads(msg.data, chars, publicUuids);
-
-            if (manuName === 'Texas Instruments')
-                commitGads(msg.data, chars, tiUuids);
+            commitGads(data, chars, nspUuids.public);
 
             if (manuName === 'sivann') 
-                commitGads(msg.data, chars, sivannUuids);
+                commitGads(data, chars, nspUuids.sivann);
+
+            if (manuName === 'Texas Instruments')
+                commitGads(data, chars, nspUuids.ti);
+            
             break;
 
         case 'DEV_LEAVING':
-            nc.commitDevLeaving(msg.data);
+            nc.commitDevLeaving(data);
+            break;
+
+        case 'ATT_IND':
+            if (data.servUuid === '0x180a') {
+
+            }
+            //commitDevReporting(permAddr, devAttrs)
+            //commitGadReporting(permAddr, auxId, gadAttrs)
             break;
     }
-});
-
-function commitGads (permAddr, chars, uuids) {
-    chars.forEach(function (char) {
-        var servUuid = char._ownerServ.uuid;
-
-        if (_.includes(uuids, char.uuid)) 
-            nc.commitGadIncoming(permAddr, servUuid + '.' + char.uuid, char);
-    });
 }
 
 /*************************************************************************************************/
 /*** Transform Raw Data Object                                                                 ***/
 /*************************************************************************************************/
-nc.cookRawDev = function (dev, raw, cb) { 
+function cookRawDev (dev, raw, cb) { 
     var netInfo = {
             role: raw.role,
             parent: raw._ownerDevmgr.bleDevices[0],
@@ -94,49 +136,15 @@ nc.cookRawDev = function (dev, raw, cb) {
     dev.setAttrs(attrs);
 
     cb(err, newDev);
-};
+}
 
-//TODO
-nc.cookRawGad = function (gad, raw, cb) { 
+function cookRawGad (gad, raw, cb) { 
     var cls;
 
-    switch (raw.uuid) {
-        case '0x2A72':
-        case '0x2A35':
-        case '0x2A9C':
-        case '0x2AA7':
-        case '0x2A5B':
-        case '0x2A18':
-        case '0x2A37':
-        case '0x2A5F':
-        case '0x2A5E':
-        case '0x2A6D':
-        case '0X2A92':
-        case '0x2A53':
-        case '0x2A98':
-        case '0x2A9D':
-        case '0x2A9D':
-            cls = 'generic';
-            break;
-        case '0x2A6E':
-        case '0x2A1C':
-        case '0x2A1E':
-            cls = 'temperature';
-            break;
-        case '0x2A6F':
-            cls = 'humidity';
-            break;
-        case '0x2A19':
-        case '0x2A07':
-        case '0x2A63':
-            cls = 'pwrMea';
-            break;
-        case '0x2A2C':
-        case '0x2AA0':
-        case '0x2AA1':
-            cls = 'magnetometer';
-            break;
-    }
+    _.forEach(ipsoDefs, function (uuids, name) {
+        if (_.includes(uuids, raw.uuid))
+            cls = name;
+    });
 
     gad.setPanelInfo({
         profile: raw._ownerServ.name, 
@@ -146,27 +154,31 @@ nc.cookRawGad = function (gad, raw, cb) {
     gad.setAttrs(raw.val);
 
     cb(err, gad);
-};
+}
 
-// TODO
 /*************************************************************************************************/
 /*** Netcore drivers                                                                           ***/
 /*************************************************************************************************/
+// TODO, need sp path
 netDrvs.start = function (callback) {
-    central.start();
+    central.start(callback);
 };
 
 netDrvs.stop = function (callback) {
-
+    central.stop(callback);
 };
 
 netDrvs.reset = function (mode, callback) {
-
+    central.reset(callback);
 };
 
 netDrvs.permitJoin = function (duration, callback) {
-    central.permitJoin(duration);
-    callback(null);
+    try {
+        central.permitJoin(duration);
+        callback(null);
+    } catch (e) {
+        callback(e);
+    }
 };
 
 netDrvs.remove = function (permAddr, callback) {
@@ -177,17 +189,24 @@ netDrvs.remove = function (permAddr, callback) {
     });
 };
 
+// TODO, result?
 netDrvs.ping = function (permAddr, callback) {
 
 };
 
 //option
 netDrvs.ban = function (permAddr, callback) {
-
+    try {
+        central.ban();
+        callback(null);
+    } catch (e) {
+        callback(e);
+    }
 };
 
 netDrvs.unban = function (permAddr, callback) {
-
+        central.ban();
+        callback(null);
 };
 
 /*************************************************************************************************/
@@ -204,6 +223,7 @@ devDrvs.write = function (permAddr, attrName, val, callback) {
 //option
 devDrvs.identify = function (permAddr, callback) {
 //not support
+    callback(null);
 };
 
 /*************************************************************************************************/
@@ -220,19 +240,80 @@ gadDrvs.write = function (permAddr, auxId, attrName, val, callback) {
 //option
 gadDrvs.exec = function (permAddr, auxId, attrName, args, callback) {
 //not support
+    callback(null);
 };
 
+//TODO
 gadDrvs.setReportCfg = function (permAddr, auxId, attrName, cfg, callback) {
-//not support
+    var dev = central.find(permAddr),
+        uuids = auxId.split('.'),
+        char = dev.findChar(uuids[0], uuids[1]),
+        rptCfgInfo = {
+            min: null,
+            max: null,
+            cfg: null,
+            oldVal: null
+        };
+
+    if (!cfg.enable) {
+
+    } else {
+
+    }
+
+    if (!_.includes(char.prop, 'notify') && !_.includes(char.prop, 'indicate')) {
+        callback(new Error('Not supported to set report configuration.'));
+    } else {
+        if (!_.isNumber(char.val.attrName)) {
+            delete cfg.gt;
+            delete cfg.lt;
+            delete cfg.step;
+        }
+
+        if (cfg.pmin && cfg.pmax) {
+            interval = ((cfg.pmin + cfg.pmax) / 2) * 1000;
+        } if (cfg.pmin) {
+            interval = (cfg.pmin + 1) * 1000;
+        } else if (cfg.pmax) {
+            interval = (cfg.pmin - 1) * 1000;
+        }
+
+        readTimer = setInterval(function () {
+            var rptCfgInfo = _.get(reportCfgTable, [permAddr, auxId, attrName]);
+
+            rptCfgInfo += 1;
+            char.read(function (err, val) {
+                
+
+
+            });
+        }, interval);
+
+        _.set(reportCfgTable, [permAddr, auxId, attrName], );
+    }
 };
 
 gadDrvs.getReportCfg = function (permAddr, auxId, attrName, callback) {
-//not support
+    var reportCfg = _.get(reportCfgTable, [permAddr, auxId, attrName, cfg]);
+
+    if (reportCfg) 
+        callback(null, reportCfg);
+    else 
+        callback(new Error('Report configuration is not be set.'));
 };
 
 /*************************************************************************************************/
 /*** Private Functions                                                                         ***/
 /*************************************************************************************************/
+function commitGads (permAddr, chars, uuids) {
+    chars.forEach(function (char) {
+        var servUuid = char._ownerServ.uuid;
+
+        if (_.includes(uuids, char.uuid)) 
+            nc.commitGadIncoming(permAddr, servUuid + '.' + char.uuid, char);
+    });
+}
+
 function operateDevAttr (type, permAddr, attrName, val, callback) {
     var dev = central.find(permAddr),
         infos = [],
@@ -292,7 +373,7 @@ function operateDevAttr (type, permAddr, attrName, val, callback) {
 function operateGadAttr (type, permAddr, auxId, attrName, val, callback) {
     var dev = central.find(permAddr),
         uuids = auxId.split('.'),
-        char = dev.servs[uuids[0]].chars[uuids[1]],
+        char = dev.findChar(uuids[0], uuids[1]),
         cb;
 
     if (char.val[attrName] === undefined) {
@@ -337,3 +418,5 @@ function execAsyncFuncs (funcs, callback) {
         });
     });
 }
+
+module.exports = bleNc;
