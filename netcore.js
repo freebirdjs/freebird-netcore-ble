@@ -75,12 +75,14 @@ function shepherdEvtHdlr (msg) {
     var data = msg.data,
         dev,
         manuName,
-        chars = [];
+        chars = [],
+        charId,
+        charData = {};
 
     switch (msg.type) {
         case 'DEV_INCOMING':
             dev = central.find(data);
-            manuName = dev.servs['0x180a'].chars['0x2a29'].val.manufacturerName;
+            manuName = dev.findChar('0x180a', '0x2a29').val.manufacturerName;
             nc.commitDevIncoming(data, dev);
 
             dev.servs.forEach(function (serv) {
@@ -102,11 +104,34 @@ function shepherdEvtHdlr (msg) {
             break;
 
         case 'ATT_IND':
-            if (data.servUuid === '0x180a') {
+            dev = central.find(data.addr);
+            charId = data.charUuid;
+            manuName = dev.findChar('0x180a', '0x2a29').val.manufacturerName;
 
+            if (data.servUuid === '0x180a') {
+                // device attributes reporting
+                if (charId === '0x2a29') {
+                    commitDevReporting(data.addr, {manufacturer: data.value});
+                } else if (charId === '0x2a24') {
+                    commitDevReporting(data.addr, {model: data.value});
+                } else if (charId === '0x2a25') {
+                    commitDevReporting(data.addr, {serial: data.value});
+                } else if (charId === '0x2a26' || charId === '0x2a27' || charId === '0x2a28') {
+                    charData.fw = dev.findChar('0x180a', charId).val.firmwareRev;
+                    charData.hw = dev.findChar('0x180a', charId).val.hardwareRev;
+                    charData.sw = dev.findChar('0x180a', charId).val.softwareRev;
+                    commitDevReporting(data.addr, {version: charData});
+                }
+            } else {
+                // gadget attributes reporting
+                if (_.includes(nspUuids.public, charId)) {
+                    commitGadReporting(data.addr, data.servUuid + '.' + charId, data.value);
+                } else if (manuName === 'sivann' && _.includes(nspUuids.sivann, charId)) {
+                    commitGadReporting(data.addr, data.servUuid + '.' + charId, data.value);
+                } else if (manuName === 'Texas Instruments' && _.includes(nspUuids.ti, charId)) {
+                    commitGadReporting(data.addr, data.servUuid + '.' + charId, data.value);
+                }
             }
-            //commitDevReporting(permAddr, devAttrs)
-            //commitGadReporting(permAddr, auxId, gadAttrs)
             break;
     }
 }
@@ -248,49 +273,85 @@ gadDrvs.setReportCfg = function (permAddr, auxId, attrName, cfg, callback) {
     var dev = central.find(permAddr),
         uuids = auxId.split('.'),
         char = dev.findChar(uuids[0], uuids[1]),
+        enable = cfg.enable,
+        rptCfgInfo = _.get(reportCfgTable, [permAddr, auxId, attrName]),
+        pmin;
+
+    delete cfg.enable;
+
+    if (!rptCfgInfo)
         rptCfgInfo = {
+            enable: false,
             min: null,
             max: null,
-            cfg: null,
-            oldVal: null
+            cfg: null
         };
 
-    if (!cfg.enable) {
-
-    } else {
-
+    if (!_.isNumber(char.val.attrName)) {
+        delete cfg.gt;
+        delete cfg.lt;
+        delete cfg.step;
     }
 
-    if (!_.includes(char.prop, 'notify') && !_.includes(char.prop, 'indicate')) {
-        callback(new Error('Not supported to set report configuration.'));
-    } else {
-        if (!_.isNumber(char.val.attrName)) {
-            delete cfg.gt;
-            delete cfg.lt;
-            delete cfg.step;
+    if (!_.isEmpty(cfg)) 
+        rptCfgInfo.cfg = cfg;
+
+    if (enable === false) {
+        dev.setNotify(uuids[0], uuids[1], false);
+
+        if (rptCfgInfo.min) {
+            clearTimeout(rptCfgInfo.min);
+            rptCfgInfo.min = null;
         }
 
-        if (cfg.pmin && cfg.pmax) {
-            interval = ((cfg.pmin + cfg.pmax) / 2) * 1000;
-        } if (cfg.pmin) {
-            interval = (cfg.pmin + 1) * 1000;
-        } else if (cfg.pmax) {
-            interval = (cfg.pmin - 1) * 1000;
+        if (rptCfgInfo.max) {
+            clearInterval(rptCfgInfo.max);
+            rptCfgInfo.max = null;
+        }
+    } else if (enable === true) {
+        dev.setNotify(uuids[0], uuids[1], true);
+
+        if (rptCfgInfo.cfg.pmin) {
+            pmin = rptCfgInfo.cfg.pmin;
+            rptCfgInfo.min = setTimeout(function () {
+                gadDrvs.read(permAddr, auxId, attrName, function (err, val) {
+                    var data = {};
+                    _.set(data, attrName, val);
+                    commitGadReporting(permAddr, auxId, data);
+                });
+            }, pmin);
+        } else {
+            pmin = 0;
         }
 
-        readTimer = setInterval(function () {
-            var rptCfgInfo = _.get(reportCfgTable, [permAddr, auxId, attrName]);
+        if (rptCfgInfo.cfg.pmax) {
+            rptCfgInfo.max = setInterval(function () {
+                gadDrvs.read(permAddr, auxId, attrName, function (err, val) {
+                    var data = {};
+                    _.set(data, attrName, val);
+                    commitGadReporting(permAddr, auxId, data);
+                });
 
-            rptCfgInfo += 1;
-            char.read(function (err, val) {
-                
+                if (!_.isNil(rptCfgInfo.min))
+                    clearTimeout(rptCfgInfo.min);
 
+                rptCfgInfo.min = null;
 
-            });
-        }, interval);
-
-        _.set(reportCfgTable, [permAddr, auxId, attrName], );
+                rptCfgInfo.min = setTimeout(function () {
+                    gadDrvs.read(permAddr, auxId, attrName, function (err, val) {
+                        var data = {};
+                        _.set(data, attrName, val);
+                        commitGadReporting(permAddr, auxId, data);
+                    });
+                }, pmin);
+            }, (rptCfgInfo.cfg.pmin + pmin));
+        }
     }
+
+    rptCfgInfo.enable = enable;
+    _.set(reportCfgTable, [permAddr, auxId, attrName], rptCfgInfo);
+
+    callback(null);
 };
 
 gadDrvs.getReportCfg = function (permAddr, auxId, attrName, callback) {
@@ -374,15 +435,38 @@ function operateGadAttr (type, permAddr, auxId, attrName, val, callback) {
     var dev = central.find(permAddr),
         uuids = auxId.split('.'),
         char = dev.findChar(uuids[0], uuids[1]),
+        oldVal = char.val[attrName],
+        rpt = false,
+        cfg = reportCfgTable[permAddr][auxId][attrName],
         cb;
 
     if (char.val[attrName] === undefined) {
         callback(new Error('attrName: ' + attrName + ' not exist.'));
     } else {
         cb = function(err, result) {
+            var currVal = char.val[attrName],
+                data = {};
+
             if (err) {
                 callback(err);
             } else {
+                if (cfg && _.isNumber(oldVal)) {
+                    if (_.isNumber(cfg.gt) && _.isNumber(cfg.lt) && cfg.lt > cfg.gt) {
+                        rpt = (oldVal !== currVal) && (currVal > cfg.gt) && (currVal < cfg.lt);
+                    } else {
+                        rpt = _.isNumber(gt) && (oldVal !== currVal) && (currVal > gt);
+                        rpt = rpt || (_.isNumber(lt) && (oldVal !== currVal) && (currVal < lt));
+                    }
+
+                    if (_.isNumber(step)) {
+                        rpt = rpt || (Math.abs(currVal - oldVal) > step);
+                    }
+
+                    if (cfg) {
+                        _.set(data, attrName, currVal);
+                        commitGadReporting(permAddr, auxId, data);
+                    }
+                }
                 callback(null, char.val[attrName]);
             }
         };
