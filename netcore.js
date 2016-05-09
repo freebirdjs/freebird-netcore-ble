@@ -1,10 +1,12 @@
+'use strict';
+
 var _ = require('lodash'),
     fs = require('fs'),
     bShepherd = require('ble-shepherd'),
     fbBase = require('freebird-base'),
     Netcore = fbBase.Netcore;
 
-var uuidDefs = JSON.parse(fs.readFileSync(__dirname + '/defs.json'));
+var uuidDefs = JSON.parse(fs.readFileSync(__dirname + '/defs/defs.json'));
     
 var nc,
     central,
@@ -111,25 +113,25 @@ function shepherdEvtHdlr (msg) {
             if (data.servUuid === '0x180a') {
                 // device attributes reporting
                 if (charId === '0x2a29') {
-                    commitDevReporting(data.addr, {manufacturer: data.value});
+                    nc.commitDevReporting(data.addr, {manufacturer: data.value});
                 } else if (charId === '0x2a24') {
-                    commitDevReporting(data.addr, {model: data.value});
+                    nc.commitDevReporting(data.addr, {model: data.value});
                 } else if (charId === '0x2a25') {
-                    commitDevReporting(data.addr, {serial: data.value});
+                    nc.commitDevReporting(data.addr, {serial: data.value});
                 } else if (charId === '0x2a26' || charId === '0x2a27' || charId === '0x2a28') {
                     charData.fw = dev.findChar('0x180a', charId).val.firmwareRev;
                     charData.hw = dev.findChar('0x180a', charId).val.hardwareRev;
                     charData.sw = dev.findChar('0x180a', charId).val.softwareRev;
-                    commitDevReporting(data.addr, {version: charData});
+                    nc.commitDevReporting(data.addr, {version: charData});
                 }
             } else {
                 // gadget attributes reporting
                 if (_.includes(nspUuids.public, charId)) {
-                    commitGadReporting(data.addr, data.servUuid + '.' + charId, data.value);
+                    nc.commitGadReporting(data.addr, data.servUuid + '.' + charId, data.value);
                 } else if (manuName === 'sivann' && _.includes(nspUuids.sivann, charId)) {
-                    commitGadReporting(data.addr, data.servUuid + '.' + charId, data.value);
+                    nc.commitGadReporting(data.addr, data.servUuid + '.' + charId, data.value);
                 } else if (manuName === 'Texas Instruments' && _.includes(nspUuids.ti, charId)) {
-                    commitGadReporting(data.addr, data.servUuid + '.' + charId, data.value);
+                    nc.commitGadReporting(data.addr, data.servUuid + '.' + charId, data.value);
                 }
             }
             break;
@@ -159,8 +161,8 @@ function cookRawDev (dev, raw, cb) {
 
     dev.setNetInfo(netInfo);
     dev.setAttrs(attrs);
-
-    cb(err, newDev);
+console.log(dev);
+    cb(null, dev);
 }
 
 function cookRawGad (gad, raw, cb) { 
@@ -178,7 +180,7 @@ function cookRawGad (gad, raw, cb) {
 
     gad.setAttrs(raw.val);
 
-    cb(err, gad);
+    cb(null, gad);
 }
 
 /*************************************************************************************************/
@@ -317,7 +319,7 @@ gadDrvs.setReportCfg = function (permAddr, auxId, attrName, cfg, callback) {
                 gadDrvs.read(permAddr, auxId, attrName, function (err, val) {
                     var data = {};
                     _.set(data, attrName, val);
-                    commitGadReporting(permAddr, auxId, data);
+                    nc.commitGadReporting(permAddr, auxId, data);
                 });
             }, pmin);
         } else {
@@ -329,7 +331,7 @@ gadDrvs.setReportCfg = function (permAddr, auxId, attrName, cfg, callback) {
                 gadDrvs.read(permAddr, auxId, attrName, function (err, val) {
                     var data = {};
                     _.set(data, attrName, val);
-                    commitGadReporting(permAddr, auxId, data);
+                    nc.commitGadReporting(permAddr, auxId, data);
                 });
 
                 if (!_.isNil(rptCfgInfo.min))
@@ -341,7 +343,7 @@ gadDrvs.setReportCfg = function (permAddr, auxId, attrName, cfg, callback) {
                     gadDrvs.read(permAddr, auxId, attrName, function (err, val) {
                         var data = {};
                         _.set(data, attrName, val);
-                        commitGadReporting(permAddr, auxId, data);
+                        nc.commitGadReporting(permAddr, auxId, data);
                     });
                 }, pmin);
             }, (rptCfgInfo.cfg.pmin + pmin));
@@ -355,7 +357,7 @@ gadDrvs.setReportCfg = function (permAddr, auxId, attrName, cfg, callback) {
 };
 
 gadDrvs.getReportCfg = function (permAddr, auxId, attrName, callback) {
-    var reportCfg = _.get(reportCfgTable, [permAddr, auxId, attrName, cfg]);
+    var reportCfg = _.get(reportCfgTable, [permAddr, auxId, attrName, 'cfg']);
 
     if (reportCfg) 
         callback(null, reportCfg);
@@ -399,7 +401,7 @@ function operateDevAttr (type, permAddr, attrName, val, callback) {
     } else {
         infos.forEach(function (info) {
             readFuncs.push(function (cb) {
-                execCb = function (err, result) {
+                var execCb = function (err, result) {
                     if (err) {
                         cb(err);
                     } else {
@@ -454,17 +456,17 @@ function operateGadAttr (type, permAddr, auxId, attrName, val, callback) {
                     if (_.isNumber(cfg.gt) && _.isNumber(cfg.lt) && cfg.lt > cfg.gt) {
                         rpt = (oldVal !== currVal) && (currVal > cfg.gt) && (currVal < cfg.lt);
                     } else {
-                        rpt = _.isNumber(gt) && (oldVal !== currVal) && (currVal > gt);
-                        rpt = rpt || (_.isNumber(lt) && (oldVal !== currVal) && (currVal < lt));
+                        rpt = _.isNumber(cfg.gt) && (oldVal !== currVal) && (currVal > cfg.gt);
+                        rpt = rpt || (_.isNumber(cfg.lt) && (oldVal !== currVal) && (currVal < cfg.lt));
                     }
 
-                    if (_.isNumber(step)) {
-                        rpt = rpt || (Math.abs(currVal - oldVal) > step);
+                    if (_.isNumber(cfg.step)) {
+                        rpt = rpt || (Math.abs(currVal - oldVal) > cfg.step);
                     }
 
                     if (cfg) {
                         _.set(data, attrName, currVal);
-                        commitGadReporting(permAddr, auxId, data);
+                        nc.commitGadReporting(permAddr, auxId, data);
                     }
                 }
                 callback(null, char.val[attrName]);

@@ -1,0 +1,31 @@
+{
+  "name": "freebird-netcore-ble",
+  "version": "0.0.0",
+  "description": "",
+  "main": "netcore.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {
+    "ble-shepherd": "^0.1.0",
+    "cc-bnp": "^0.1.1",
+    "freebird-base": "^0.1.1",
+    "lodash": "^4.11.2"
+  },
+  "devDependencies": {
+    "should": "^8.3.1"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/freebirdjs/freebird-netcore-ble.git"
+  },
+  "author": "Hedy Wang",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/freebirdjs/freebird-netcore-ble/issues"
+  },
+  "homepage": "https://github.com/freebirdjs/freebird-netcore-ble#readme"
+}
