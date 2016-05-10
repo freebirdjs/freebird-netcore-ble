@@ -10,6 +10,7 @@ var uuidDefs = JSON.parse(fs.readFileSync(__dirname + '/defs/defs.json'));
     
 var nc,
     central,
+    chip,
     netDrvs = {},
     devDrvs = {},
     gadDrvs = {};
@@ -42,8 +43,8 @@ var nspUuids = {
     reportCfgTable = {};
 
 var bleNc = function (chipName) {
+    chip = chipName;
     central = bShepherd(chipName);
-    central.on('IND', shepherdEvtHdlr);
 
     nc = new Netcore('blecore', central, {phy: 'ble', nwk: 'ble'});
     nc.cookRawDev = cookRawDev;
@@ -84,11 +85,12 @@ function shepherdEvtHdlr (msg) {
     switch (msg.type) {
         case 'DEV_INCOMING':
             dev = central.find(data);
+
             manuName = dev.findChar('0x180a', '0x2a29').val.manufacturerName;
             nc.commitDevIncoming(data, dev);
 
-            dev.servs.forEach(function (serv) {
-                chars = chars.concat(serv.chars);
+            _.forEach(dev.servs, function (serv) {
+                chars = _.merge(chars, serv.chars);
             });
 
             commitGads(data, chars, nspUuids.public);
@@ -161,7 +163,7 @@ function cookRawDev (dev, raw, cb) {
 
     dev.setNetInfo(netInfo);
     dev.setAttrs(attrs);
-console.log(dev);
+
     cb(null, dev);
 }
 
@@ -188,7 +190,20 @@ function cookRawGad (gad, raw, cb) {
 /*************************************************************************************************/
 // TODO, need sp path
 netDrvs.start = function (callback) {
-    central.start(callback);
+    var app = function () {};
+
+    if (chip === 'cc254x') {
+        //TODO
+    } else if (chip === 'csr8510') {
+        central.start(app, function(err) {
+            if (err) {
+                callback(err);
+            } else {
+                central.on('IND', shepherdEvtHdlr);
+                callback(null);
+            }
+        });
+    }
 };
 
 netDrvs.stop = function (callback) {
@@ -224,7 +239,7 @@ netDrvs.ping = function (permAddr, callback) {
 //option
 netDrvs.ban = function (permAddr, callback) {
     try {
-        central.ban();
+        central.ban(permAddr);
         callback(null);
     } catch (e) {
         callback(e);
@@ -232,7 +247,7 @@ netDrvs.ban = function (permAddr, callback) {
 };
 
 netDrvs.unban = function (permAddr, callback) {
-        central.ban();
+        central.unban(permAddr);
         callback(null);
 };
 
@@ -369,7 +384,8 @@ gadDrvs.getReportCfg = function (permAddr, auxId, attrName, callback) {
 /*** Private Functions                                                                         ***/
 /*************************************************************************************************/
 function commitGads (permAddr, chars, uuids) {
-    chars.forEach(function (char) {
+    _.forEach(chars, function (char) {
+
         var servUuid = char._ownerServ.uuid;
 
         if (_.includes(uuids, char.uuid)) 
@@ -399,7 +415,7 @@ function operateDevAttr (type, permAddr, attrName, val, callback) {
     if (infos.length === 0) {
         callback(new Error('attrName: ' + attrName + ' not exist.'));
     } else {
-        infos.forEach(function (info) {
+        _.forEach(infos, function (info) {
             readFuncs.push(function (cb) {
                 var execCb = function (err, result) {
                     if (err) {
@@ -487,7 +503,7 @@ function execAsyncFuncs (funcs, callback) {
         flag = false,
         allResult = [];
 
-    funcs.forEach(function (func) {
+    _.forEach(funcs, function (func) {
         func(function (err, result) {
             count += 1;
 

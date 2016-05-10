@@ -17,3 +17,14 @@ setInterval(function() {
 
 	console.log('6 second');
 }, 6000);
+
+var obj = {
+	a: 0,
+	b: 1,
+	c: 2,
+	d: 3
+};
+
+obj.forEach(function (val) {
+	console.log(val);
+});
