@@ -1,6 +1,7 @@
 var should = require('should'),
     _ = require('lodash'),
-    nc = require('../netcore')('csr8510'),
+    // nc = require('../netcore')('csr8510'),
+    nc = require('../netcore')('cc254x', {path: '/dev/ttyACM0'}),
     Netcore = require('freebird-base').Netcore,
     Device = require('freebird-base').Device,
     Gadget = require('freebird-base').Gadget;
@@ -144,18 +145,11 @@ describe('Netcore Drivers Check', function () {
     });
 
     it('permitJoin()', function (done) {
-        var hdlr = function (msg) {
-                if (msg.type === 'NWK_PERMITJOIN') {
-                    if (msg.data === 30) {
-                        nc._controller.removeListener('IND', hdlr);
-                        done();
-                    }
-                }
-            };
-
-        nc._controller.on('IND', hdlr);
-        nc.permitJoin(30, function (err) {
-            if (err) console.log(err);
+        nc.permitJoin(30, function (err, result) {
+            if (err) 
+                console.log(err);
+            else if (result === 30) 
+                done();
         });
     });
 
@@ -211,7 +205,7 @@ describe('Netcore Drivers Check', function () {
 describe('Device Drivers Check', function () {
     var permAddr = '0x544a165e1f53';
 
-    this.timeout(5000);
+    this.timeout(10000);
     it('connect to keyfob', function (done) {
         nc._controller.on('IND', function (msg) {
             if (msg.type === 'DEV_INCOMING') {
@@ -221,7 +215,7 @@ describe('Device Drivers Check', function () {
         }); 
     });
 
-    it('read()', function () {
+    it('read()', function (done) {
         nc.devRead(permAddr, 'manufacturer', function (err, result) {
             if (err) {
                 console.log(err);
@@ -230,15 +224,10 @@ describe('Device Drivers Check', function () {
         });
     });
 
-    it('write()', function () {
+    it('write()', function (done) {
         nc.devWrite(permAddr, 'manufacturer', 'Texas Instruments', function (err, result) {
             if (err) {
-                console.log(err);
-            } else {
-                nc.devRead(permAddr, 'manufacturer', function (err, result) {
-                    if (result === 'Texas Instruments')
-                        done();
-                });
+                done();
             }
         });
     });
@@ -250,23 +239,63 @@ describe('Device Drivers Check', function () {
 });
 
 describe('Gadget Drivers Check', function () {
-    it('read()', function () {
-        nc.gadRead()
+    var permAddr = '0x544a165e1f53';
+
+    this.timeout(5000);
+    it('read()', function (done) {
+        nc.gadRead(permAddr, '0x1800.0x2a00', 'name', function (err, result) {
+            if (err) {
+                console.log(err);
+            } else if (result === 'TI BLE Keyfob') {
+                done();
+            }
+        });
     });
 
-    it('write()', function () {
-
+    it('write()', function (done) {
+        nc.gadWrite(permAddr, '0x1800.0x2a02', 'flag', true, function (err, result) {
+            if (err) {
+                console.log(err);
+            } else {
+                nc.gadRead(permAddr, '0x1800.0x2a02', 'flag', function (err, result) {
+                    if (err) {
+                        console.log(err);
+                    } else if (result === true) {
+                        done();
+                    }
+                });
+            }
+        });
     });
 
-    it('exec()', function () {
-
+    it('exec()', function (done) {
+        //not implement
+        done();
     });
 
-    it('setReportCfg()', function () {
+    var cfg = {
+            pmin: 5,
+            pmax: 60,
+            gt: 50,
+            enable: true
+        };
 
+    it('setReportCfg() - error', function (done) {
+        nc.setReportCfg(permAddr, '0x1800.0x2a00', 'name', cfg, function (err, result) {
+            if (err) done();
+        });
     });
 
-    it('getReportCfg()', function () {
+    it('setReportCfg()', function (done) {
+        delete cfg.gt;
+        nc.setReportCfg(permAddr, '0x1800.0x2a00', 'name', cfg, function (err, result) {
+            if (result === true) done();
+        });
+    });
 
+    it('getReportCfg()', function (done) {
+        nc.getReportCfg(permAddr, '0x1800.0x2a00', 'name', function (err, result) {
+            if (_.isEqual(result, cfg)) done();
+        });
     });
 });

@@ -11,6 +11,7 @@ var uuidDefs = JSON.parse(fs.readFileSync(__dirname + '/defs/defs.json'));
 var nc,
     central,
     chip,
+    spCfg,
     netDrvs = {},
     devDrvs = {},
     gadDrvs = {};
@@ -42,8 +43,15 @@ var nspUuids = {
     },
     reportCfgTable = {};
 
-var bleNc = function (chipName) {
+var bleNc = function (chipName, spConfig) {
+    if (chipName !== 'cc254x' && chipName !== 'csr8510')
+        throw new Error('chipName must equal to cc254x or csr8510');
+
+    if (chipName === 'cc254x' && !spConfig)
+        throw new Error('spConfig must be given with cc254x SoC');
+
     chip = chipName;
+    spCfg = spConfig;
     central = bShepherd(chipName);
 
     nc = new Netcore('blecore', central, {phy: 'ble', nwk: 'ble'});
@@ -188,12 +196,18 @@ function cookRawGad (gad, raw, cb) {
 /*************************************************************************************************/
 /*** Netcore drivers                                                                           ***/
 /*************************************************************************************************/
-// TODO, need sp path
 netDrvs.start = function (callback) {
     var app = function () {};
 
     if (chip === 'cc254x') {
-        //TODO
+        central.start(app, spCfg, function(err) {
+            if (err) {
+                callback(err);
+            } else {
+                central.on('IND', shepherdEvtHdlr);
+                callback(null);
+            }
+        });
     } else if (chip === 'csr8510') {
         central.start(app, function(err) {
             if (err) {
@@ -215,10 +229,18 @@ netDrvs.reset = function (mode, callback) {
 };
 
 netDrvs.permitJoin = function (duration, callback) {
+    var cb = function (msg) {
+            if (msg.type === 'NWK_PERMITJOIN')
+                callback(null, msg.data);
+
+            central.removeListener('IND', cb);
+        };
+
     try {
+        central.on('IND', cb);
         central.permitJoin(duration);
-        callback(null);
     } catch (e) {
+        central.removeListener('IND', cb);
         callback(e);
     }
 };
@@ -227,7 +249,10 @@ netDrvs.remove = function (permAddr, callback) {
     var dev = central.find(permAddr);
 
     dev.remove(function (err) {
-        callback(err);
+        if (err) 
+            callback(err);
+        else 
+            callback(null, permAddr);
     });
 };
 
@@ -240,7 +265,7 @@ netDrvs.ping = function (permAddr, callback) {
 netDrvs.ban = function (permAddr, callback) {
     try {
         central.ban(permAddr);
-        callback(null);
+        callback(null, permAddr);
     } catch (e) {
         callback(e);
     }
@@ -248,7 +273,7 @@ netDrvs.ban = function (permAddr, callback) {
 
 netDrvs.unban = function (permAddr, callback) {
         central.unban(permAddr);
-        callback(null);
+        callback(null, permAddr);
 };
 
 /*************************************************************************************************/
@@ -259,7 +284,7 @@ devDrvs.read = function (permAddr, attrName, callback) {
 };
 
 devDrvs.write = function (permAddr, attrName, val, callback) {
-    operateDevAttr('read', permAddr, attrName, val, callback);
+    operateDevAttr('write', permAddr, attrName, val, callback);
 };
 
 //option
@@ -285,7 +310,6 @@ gadDrvs.exec = function (permAddr, auxId, attrName, args, callback) {
     callback(null);
 };
 
-//TODO
 gadDrvs.setReportCfg = function (permAddr, auxId, attrName, cfg, callback) {
     var dev = central.find(permAddr),
         uuids = auxId.split('.'),
@@ -304,10 +328,9 @@ gadDrvs.setReportCfg = function (permAddr, auxId, attrName, cfg, callback) {
             cfg: null
         };
 
-    if (!_.isNumber(char.val.attrName)) {
-        delete cfg.gt;
-        delete cfg.lt;
-        delete cfg.step;
+    if (!_.isNumber(char.val[attrName])) {
+        if (!_.isNil(cfg.gt) || !_.isNil(cfg.lt) ||!_.isNil(cfg.step))
+            return callback(new Error('Report configuration setting error.'));
     }
 
     if (!_.isEmpty(cfg)) 
@@ -361,14 +384,14 @@ gadDrvs.setReportCfg = function (permAddr, auxId, attrName, cfg, callback) {
                         nc.commitGadReporting(permAddr, auxId, data);
                     });
                 }, pmin);
-            }, (rptCfgInfo.cfg.pmin + pmin));
+            }, (rptCfgInfo.cfg.pmax + pmin));
         }
     }
 
     rptCfgInfo.enable = enable;
     _.set(reportCfgTable, [permAddr, auxId, attrName], rptCfgInfo);
 
-    callback(null);
+    callback(null, true);
 };
 
 gadDrvs.getReportCfg = function (permAddr, auxId, attrName, callback) {
@@ -417,22 +440,22 @@ function operateDevAttr (type, permAddr, attrName, val, callback) {
     } else {
         _.forEach(infos, function (info) {
             readFuncs.push(function (cb) {
-                var execCb = function (err, result) {
-                    if (err) {
-                        cb(err);
-                    } else {
-                        if (type === 'read') {
-                            cb(null, result[info.resultKey]);
+                var char = dev.servs['0x180a'].chars[info.char],
+                    execCb = function (err, result) {
+                        if (err) {
+                            cb(err);
                         } else {
-                            cb(null, dev.servs['0x180a'].chars[info.char].val[info.resultKey]);
+                            cb(null, char.val[info.resultKey]);
                         }
-                    }
-                };
+                    };
 
-                if (type === 'read') {
-                    dev.servs['0x180a'].chars[info.char].read(execCb);
+                if (!char.val[info.resultKey]) {
+                    execCb(new Error('attrName: ' + attrName + ' not exist.'));
+                } else if (type === 'read') {
+                    dev.read('0x180a', info.char, execCb);
                 } else {
-                    dev.servs['0x180a'].chars[info.char].write(val, execCb);
+                    char.val[info.resultKey] = val;
+                    dev.write('0x180a', info.char, char.val, execCb);
                 }
             });
         });
@@ -455,7 +478,8 @@ function operateGadAttr (type, permAddr, auxId, attrName, val, callback) {
         char = dev.findChar(uuids[0], uuids[1]),
         oldVal = char.val[attrName],
         rpt = false,
-        cfg = reportCfgTable[permAddr][auxId][attrName],
+        rptCfgInfo = _.get(reportCfgTable, [permAddr, auxId, attrName]),
+        cfg = _.get(rptCfgInfo, 'cfg'),
         cb;
 
     if (char.val[attrName] === undefined) {
@@ -468,7 +492,7 @@ function operateGadAttr (type, permAddr, auxId, attrName, val, callback) {
             if (err) {
                 callback(err);
             } else {
-                if (cfg && _.isNumber(oldVal)) {
+                if (rptCfgInfo && cfg && cfg.enable && _.isNumber(oldVal)) {
                     if (_.isNumber(cfg.gt) && _.isNumber(cfg.lt) && cfg.lt > cfg.gt) {
                         rpt = (oldVal !== currVal) && (currVal > cfg.gt) && (currVal < cfg.lt);
                     } else {
@@ -480,7 +504,7 @@ function operateGadAttr (type, permAddr, auxId, attrName, val, callback) {
                         rpt = rpt || (Math.abs(currVal - oldVal) > cfg.step);
                     }
 
-                    if (cfg) {
+                    if (rpt) {
                         _.set(data, attrName, currVal);
                         nc.commitGadReporting(permAddr, auxId, data);
                     }
@@ -490,10 +514,10 @@ function operateGadAttr (type, permAddr, auxId, attrName, val, callback) {
         };
 
         if (type === 'read'){
-            char.read(cb);
+            dev.read(uuids[0], uuids[1], cb);
         } else {
             char.val[attrName] = val;
-            char.write(char.val, cb);
+            dev.write(uuids[0], uuids[1], char.val, cb);
         }
     }
 }
