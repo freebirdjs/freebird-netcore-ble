@@ -154,7 +154,7 @@ function shepherdEvtHdlr (msg) {
 function cookRawDev (dev, raw, cb) { 
     var netInfo = {
             role: raw.role,
-            parent: raw._ownerDevmgr.bleDevices[0],
+            parent: null,
             maySleep: false,
             address: { permanent: raw.addr, dynamic: raw.connHdl },
         },
@@ -168,6 +168,11 @@ function cookRawDev (dev, raw, cb) {
                 sw: raw.servs['0x180a'].chars['0x2a28'].val.softwareRev,
             }
         };
+
+    if (chip === 'cc254x')
+        netInfo.parent = central.bleCentral.addr;
+    else 
+        netInfo.parent = central.bleCentral;
 
     dev.setNetInfo(netInfo);
     dev.setAttrs(attrs);
