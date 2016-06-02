@@ -1,7 +1,7 @@
 var should = require('should'),
     _ = require('lodash'),
-    // nc = require('../netcore')('csr8510'),
-    nc = require('../netcore')('cc254x', {path: '/dev/ttyACM0'}),
+    // nc = require('../netcore')('noble'),
+    nc = require('../netcore')('cc-bnp', {path: '/dev/ttyACM0'}),
     Netcore = require('freebird-base').Netcore,
     Device = require('freebird-base').Device,
     Gadget = require('freebird-base').Gadget;
@@ -53,53 +53,6 @@ var rawDev = {
 var dev = new Device(nc, rawDev),
     gad = new Gadget(dev, '0xcc00.0xcc07', rawGad);
 
-describe('Cook Functional Check', function() {
-    it('cookRawDev()', function (done) {
-        nc.cookRawDev(dev, rawDev, function (err, cooked) {
-            var netInfo = {
-                    role: 'peripheral',
-                    parent: {role: 'central'},
-                    address: {permanent: '0x544a165e1f53', dynamic: 0}
-                },
-                attrInfo = {
-                    manufacturer: 'Manufacturer Name',
-                    model: 'Model Number',
-                    serial: 'Serial Number',
-                    version: {hw: 'Hardware Revision', sw: 'Software Revision', fw: 'Firmware Revision'}
-                };
-
-            if (err) {
-                console.log(err);
-            } else {
-                if (_.isMatch(cooked._net, netInfo) &&
-                    _.isMatch(cooked._attrs, attrInfo) )
-                    done();
-            }
-        });
-    });
-
-    it('cookRawGad()', function (done) {
-        nc.cookRawGad(gad, rawGad, function (err, cooked) {
-            var panelInfo = {
-                    profile: 'sensor',
-                    class: 'temperature'
-                },
-                attrInfo = {
-                    flags: 0,
-                    sensorValue: 25
-                };
-
-            if (err) {
-                console.log(err);
-            } else {
-                if (_.isMatch(cooked._panel, panelInfo) &&
-                    _.isMatch(cooked._attrs , attrInfo))
-                    done();
-            }
-        });
-    });
-});
-
 describe('Netcore Drivers Check', function () {
     this.timeout(5000);
     it('start()', function (done) {
@@ -133,15 +86,14 @@ describe('Netcore Drivers Check', function () {
     });
 
     it('reset()', function (done) {
-        // TODO
-        done();
-        // nc.reset(function (err) {
-        //     if (err) {
-        //         console.log(err);
-        //     } else {
-        //         done();
-        //     }
-        // });
+        // done();
+        nc.reset(function (err) {
+            if (err) {
+                console.log(err);
+            } else {
+                done();
+            }
+        });
     });
 
     it('permitJoin()', function (done) {
@@ -197,6 +149,52 @@ describe('Netcore Drivers Check', function () {
                 console.log(err);
             } else if (!nc.isBlacklisted('0x544a165e1f53')) {
                 done();
+            }
+        });
+    });
+});
+
+describe('Cook Functional Check', function() {
+    it('cookRawDev()', function (done) {
+        nc.cookRawDev(dev, rawDev, function (err, cooked) {
+            var netInfo = {
+                    role: 'peripheral',
+                    address: {permanent: '0x544a165e1f53', dynamic: 0}
+                },
+                attrInfo = {
+                    manufacturer: 'Manufacturer Name',
+                    model: 'Model Number',
+                    serial: 'Serial Number',
+                    version: {hw: 'Hardware Revision', sw: 'Software Revision', fw: 'Firmware Revision'}
+                };
+
+            if (err) {
+                console.log(err);
+            } else {
+                if (_.isMatch(cooked._net, netInfo) &&
+                    _.isMatch(cooked._attrs, attrInfo) )
+                    done();
+            }
+        });
+    });
+
+    it('cookRawGad()', function (done) {
+        nc.cookRawGad(gad, rawGad, function (err, cooked) {
+            var panelInfo = {
+                    profile: 'sensor',
+                    class: 'temperature'
+                },
+                attrInfo = {
+                    flags: 0,
+                    sensorValue: 25
+                };
+
+            if (err) {
+                console.log(err);
+            } else {
+                if (_.isMatch(cooked._panel, panelInfo) &&
+                    _.isMatch(cooked._attrs , attrInfo))
+                    done();
             }
         });
     });

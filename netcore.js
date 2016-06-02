@@ -10,7 +10,7 @@ var uuidDefs = JSON.parse(fs.readFileSync(__dirname + '/defs/defs.json'));
     
 var nc,
     central,
-    chip,
+    subMod,
     spCfg,
     netDrvs = {},
     devDrvs = {},
@@ -43,16 +43,16 @@ var nspUuids = {
     },
     reportCfgTable = {};
 
-var bleNc = function (chipName, spConfig) {
-    if (chipName !== 'cc254x' && chipName !== 'csr8510')
-        throw new Error('chipName must equal to cc254x or csr8510');
+var bleNc = function (subModule, spConfig) {
+    if (subModule !== 'cc-bnp' && subModule !== 'noble')
+        throw new Error('subModule must equal to cc-bnp or noble');
 
-    if (chipName === 'cc254x' && !spConfig)
-        throw new Error('spConfig must be given with cc254x SoC');
+    if (subModule === 'cc-bnp' && !spConfig)
+        throw new Error('spConfig must be given with cc-bnp sub module');
 
-    chip = chipName;
+    subMod = subModule;
     spCfg = spConfig;
-    central = bShepherd(chipName);
+    central = bShepherd(subMod);
 
     nc = new Netcore('blecore', central, {phy: 'ble', nwk: 'ble'});
     nc.cookRawDev = cookRawDev;
@@ -169,7 +169,7 @@ function cookRawDev (dev, raw, cb) {
             }
         };
 
-    if (chip === 'cc254x')
+    if (subMod === 'cc-bnp')
         netInfo.parent = central.bleCentral.addr;
     else 
         netInfo.parent = central.bleCentral;
@@ -181,7 +181,13 @@ function cookRawDev (dev, raw, cb) {
 }
 
 function cookRawGad (gad, raw, cb) { 
-    var cls;
+    var cls,
+        profile;
+
+    if (raw._ownerServ.name)
+        profile = raw._ownerServ.name;
+    else 
+        profile = raw._ownerServ.uuid;
 
     _.forEach(ipsoDefs, function (uuids, name) {
         if (_.includes(uuids, raw.uuid))
@@ -202,35 +208,40 @@ function cookRawGad (gad, raw, cb) {
 /*** Netcore drivers                                                                           ***/
 /*************************************************************************************************/
 netDrvs.start = function (callback) {
-    var app = function () {};
+    var app = function () {},
+        cb = function (err, result) {
+            if (err)
+                callback(err);
+            else {
+                nc.commitReady();
+                callback(null);
+            }
+        };
 
-    if (chip === 'cc254x') {
-        central.start(app, spCfg, function(err) {
-            if (err) {
-                callback(err);
-            } else {
-                central.on('IND', shepherdEvtHdlr);
-                callback(null);
-            }
-        });
-    } else if (chip === 'csr8510') {
-        central.start(app, function(err) {
-            if (err) {
-                callback(err);
-            } else {
-                central.on('IND', shepherdEvtHdlr);
-                callback(null);
-            }
-        });
+    if (central._enable === true) {
+        callback(null);
+    } else {
+        if (subMod === 'cc-bnp')
+            central.start(app, spCfg, callback);
+        else if (subMod === 'noble') 
+            central.start(app, callback);
     }
 };
 
 netDrvs.stop = function (callback) {
-    central.stop(callback);
+    central.permitJoin(0);
+    callback(null);
 };
 
 netDrvs.reset = function (mode, callback) {
-    central.reset(callback);
+    central.reset(function (err) {
+        if (err)
+            callback(err);
+        else {
+            nc.commitReady();
+            callback(null);
+        } 
+    });
 };
 
 netDrvs.permitJoin = function (duration, callback) {
@@ -269,7 +280,7 @@ netDrvs.ping = function (permAddr, callback) {
 //option
 netDrvs.ban = function (permAddr, callback) {
     try {
-        central.ban(permAddr);
+        central.toBlack(permAddr);
         callback(null, permAddr);
     } catch (e) {
         callback(e);
@@ -277,7 +288,7 @@ netDrvs.ban = function (permAddr, callback) {
 };
 
 netDrvs.unban = function (permAddr, callback) {
-        central.unban(permAddr);
+        central.cancelToBlack(permAddr);
         callback(null, permAddr);
 };
 

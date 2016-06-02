@@ -8,11 +8,12 @@
   },
   "dependencies": {
     "ble-shepherd": "^0.1.0",
-    "cc-bnp": "^0.1.1",
     "freebird-base": "^0.1.1",
     "lodash": "^4.11.2"
   },
   "devDependencies": {
+    "freebird": "0.0.8",
+    "freebird-websocket": "0.0.4",
     "should": "^8.3.1"
   },
   "scripts": {
