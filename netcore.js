@@ -53,6 +53,7 @@ var bleNc = function (subModule, spConfig) {
     subMod = subModule;
     spCfg = spConfig;
     central = bShepherd(subMod);
+    central.on('IND', shepherdEvtHdlr);
 
     nc = new Netcore('blecore', central, {phy: 'ble', nwk: 'ble'});
     nc.cookRawDev = cookRawDev;
@@ -86,7 +87,7 @@ function shepherdEvtHdlr (msg) {
     var data = msg.data,
         dev,
         manuName,
-        chars = [],
+        chars = {},
         charId,
         charData = {};
 
@@ -182,7 +183,8 @@ function cookRawDev (dev, raw, cb) {
 
 function cookRawGad (gad, raw, cb) { 
     var cls,
-        profile;
+        profile,
+        newVal = {};
 
     if (raw._ownerServ.name)
         profile = raw._ownerServ.name;
@@ -199,7 +201,7 @@ function cookRawGad (gad, raw, cb) {
         class: cls
     });
 
-    gad.setAttrs(raw.val);
+    gad.setAttrs(_.merge({}, raw.val));
 
     cb(null, gad);
 }
@@ -238,7 +240,9 @@ netDrvs.reset = function (mode, callback) {
         if (err)
             callback(err);
         else {
-            nc.commitReady();
+            setTimeout(function () {
+                nc.commitReady();
+            }, 10);
             callback(null);
         } 
     });
@@ -279,12 +283,20 @@ netDrvs.ping = function (permAddr, callback) {
 
 //option
 netDrvs.ban = function (permAddr, callback) {
-    try {
-        central.toBlack(permAddr);
-        callback(null, permAddr);
-    } catch (e) {
-        callback(e);
-    }
+    var dev = central.find(permAddr);
+
+    dev.remove(function (err) {
+        if (err)
+            callback(err);
+        else {
+            try {
+                central.toBlack(permAddr);
+                callback(null, permAddr);
+            } catch (e) {
+                callback(e);
+            }
+        }
+    });
 };
 
 netDrvs.unban = function (permAddr, callback) {
@@ -424,7 +436,6 @@ gadDrvs.getReportCfg = function (permAddr, auxId, attrName, callback) {
 /*************************************************************************************************/
 function commitGads (permAddr, chars, uuids) {
     _.forEach(chars, function (char) {
-
         var servUuid = char._ownerServ.uuid;
 
         if (_.includes(uuids, char.uuid)) 
