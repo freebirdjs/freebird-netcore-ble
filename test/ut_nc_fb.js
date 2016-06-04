@@ -23,9 +23,14 @@ var fbird = new Freebird(httpServer),
     bleNc = require('../netcore')('noble'),
     wsClient = new WsClient();
 
-// device variable
+// devices
 var remotrCtrl,
     nineAxix;
+
+// gadgets
+var multiSel,
+    nineAxixActuation,
+    acceler;
     
 
 describe('Sybsys: Net Functional Test - ', function () {
@@ -147,7 +152,16 @@ describe('Sybsys: Net Functional Test - ', function () {
             if (err)
                 console.log(err);
             else if (msg.data.gads.length === gadIds.length) {
-                // console.log(msg.data.gads);
+                _.forEach(msg.data.gads, function (gad) {
+                    var cls = gad.panel.class;
+
+                    if (cls === 'accelerometer')
+                        acceler = gad;
+                    else if (cls === 'actuation' && gad.attrs.appType === 'NineAxisSensor')
+                        nineAxixActuation = gad;
+                    else if (cls === 'multistateSelector')
+                        multiSel = gad;
+                });
                 done();
             }
         });
@@ -244,8 +258,7 @@ describe('Sybsys: Net Functional Test - ', function () {
 
     it('unban()', function (done) {
         wsClient.once('statusChanged', function (msg) {
-            if (msg.data.status === 'online')
-                done();
+            done();
         });
         wsClient.sendReq('net', 'unban', { ncName : 'blecore', permAddr: remotrCtrl.net.address.permanent }, function (err, msg) {
             if (err)
@@ -262,25 +275,25 @@ describe('Sybsys: Net Functional Test - ', function () {
         });
     });
 
-    this.timeout(10000);
-    it('reset()', function (done) {
-        var rspCount = 0;
+    // this.timeout(10000);
+    // it('reset()', function (done) {
+    //     var rspCount = 0;
 
-        wsClient.once('stopped', function (msg) {
-            if (msg.data.netcore === 'blecore')
-                rspCount += 1;
-        });
-        wsClient.once('started', function (msg) {
-            if (msg.data.netcore === 'blecore' && rspCount === 2)
-                done();
-        });
-        wsClient.sendReq('net', 'reset', { ncName : 'blecore' }, function (err, msg) {
-            if (err)
-                console.log(err);
-            else
-                rspCount += 1;
-        });
-    });
+    //     wsClient.once('stopped', function (msg) {
+    //         if (msg.data.netcore === 'blecore')
+    //             rspCount += 1;
+    //     });
+    //     wsClient.once('started', function (msg) {
+    //         if (msg.data.netcore === 'blecore' && rspCount === 2)
+    //             done();
+    //     });
+    //     wsClient.sendReq('net', 'reset', { ncName : 'blecore' }, function (err, msg) {
+    //         if (err)
+    //             console.log(err);
+    //         else
+    //             rspCount += 1;
+    //     });
+    // });
 
     // it('ping()', function (done) {
         // [TODO] ble-netcore not implement yet
@@ -329,6 +342,7 @@ describe('Sybsys: Dev Functional Test - ', function () {
 
     it('read()', function (done) {
         wsClient.sendReq('dev', 'read', { id: remotrCtrl.id, attrName: 'manufacturer' }, function (err, msg) {
+            console.log(msg);
             if (err)
                 console.log(err);
             else if (msg.data.value === remotrCtrl.attrs.manufacturer)
@@ -378,42 +392,89 @@ describe('Sybsys: Dev Functional Test - ', function () {
     });
 });
 
-// describe('Sybsys: Gad Functional Test - ', function () {
-//     it('enable', function (done) {
+describe('Sybsys: Gad Functional Test - ', function () {
+    it('disable()', function (done) {
+        wsClient.sendReq('gad', 'disable', { id: acceler.id }, function (err, msg) {
+            if (err)
+                console.log(err);
+            else if (msg.data.enabled === false)
+                done();
+        });
+    });
 
-//     });
+    it('enable()', function (done) {
+        wsClient.sendReq('gad', 'enable', { id: acceler.id }, function (err, msg) {
+            if (err)
+                console.log(err);
+            else if (msg.data.enabled === true)
+                done();
+        });
+    });
 
-//     it('disable', function (done) {
+    it('read()', function (done) {
+        wsClient.sendReq('gad', 'read', { id: acceler.id, attrName: 'xValue' }, function (err, msg) {
+            console.log(msg);
+            if (err)
+                console.log(err);
+            else if (msg.data.value === 0)
+                done();
+        });
+    });
 
-//     });
+    it('write()', function (done) {
+        var flag = false;
 
-//     it('read', function (done) {
+        wsClient.on('attrsChanged', function (msg) {
+            if (msg.data.onOff === true)
+                done();
+        });
 
-//     });
+        wsClient.sendReq('gad', 'write', { id: nineAxixActuation.id, attrName: 'onOff', value: true }, function (err, msg) {
+            if (err)
+                console.log(err);
+            else if (_.isEqual(msg.data, {value: true}))
+                flag = true;
+        });
+    });
 
-//     it('write', function (done) {
+    it('exec()', function (done) {
+        wsClient.sendReq('gad', 'exec', { id: acceler.id, attrName: 'xValue' }, function (err, msg) {
+            if (err)
+                console.log(err);
+            else 
+                done();
+        });
+    });
 
-//     });
+    it('setReportCfg()', function (done) {
+        var reportCfg = {
+            enable: true,
+            pmin: 3,
+            pmax: 6
+        };
 
-//     it('exec', function (done) {
+        wsClient.sendReq('gad', 'setReportCfg', { id: acceler.id, attrName: 'xValue', rptCfg: reportCfg }, function (err, msg) {
+            if (err)
+                console.log(err);
+            else 
+                done();
+        });
+    });
 
-//     });
+    this.timeout(60000);
+    it('getReportCfg()', function (done) {
+        wsClient.on('attrsReport', function (msg) {
+            console.log(msg);
+        });
+    });
 
-//     it('setReportCfg', function (done) {
+    // it('getProps()', function (done) {
 
-//     });
+    // });
 
-//     it('getReportCfg', function (done) {
+    // it('getProps()', function (done) {
 
-//     });
-
-//     it('getReportCfg', function (done) {
-
-//     });
-
-//     it('getReportCfg', function (done) {
-
-//     });
-// });
+    // });
+});
 
 wsClient.stop();

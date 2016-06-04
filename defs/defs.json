@@ -36,26 +36,6 @@
             "0x2AA1"
         ]
     },
-    "sivann": {
-        "dIn": ["0xcc00"],
-        "dOut": ["0xcc01"],
-        "aIn": ["0xcc02"],
-        "aOut": ["0xcc03"],
-        "generic": ["0xcc04"],
-        "illuminance": ["0xcc05"],
-        "presence": ["0xcc06"],
-        "temperature": ["0xcc07"],
-        "humidity": ["0xcc08"],
-        "pwrMea": ["0xcc09"],
-        "actuation": ["0xcc0a"],
-        "setPoint": ["0xcc0b"],
-        "loadCtrl": ["0xcc0c"],
-        "lightCtrl": ["0xcc0d"],
-        "pwrCtrl": ["0xcc0e"],
-        "accelerometer": ["0xcc0f"],
-        "magnetometer": ["0xcc10"],
-        "barometer": ["0xcc11"]
-    },
     "ti": {
 
     }

@@ -4,7 +4,8 @@ var _ = require('lodash'),
     fs = require('fs'),
     bShepherd = require('ble-shepherd'),
     fbBase = require('freebird-base'),
-    Netcore = fbBase.Netcore;
+    Netcore = fbBase.Netcore,
+    bipso = require('bipso');
 
 var uuidDefs = JSON.parse(fs.readFileSync(__dirname + '/defs/defs.json'));
     
@@ -18,29 +19,10 @@ var nc,
 
 var nspUuids = {
         public: [],
-        sivann: [],
+        bipso: [],
         ti: []
     },
-    ipsoDefs = {
-        dIn: [],
-        dOut: [],
-        aIn: [],
-        aOut: [],
-        generic: [],
-        illuminance: [],
-        presence: [],
-        temperature: [],
-        humidity: [],
-        pwrMea: [],
-        actuation: [],
-        setPoint: [],
-        loadCtrl: [],
-        lightCtrl: [],
-        pwrCtrl: [],
-        accelerometer: [],
-        magnetometer: [],
-        barometer: []
-    },
+    ipsoDefs = {},
     reportCfgTable = {};
 
 var bleNc = function (subModule, spConfig) {
@@ -54,6 +36,7 @@ var bleNc = function (subModule, spConfig) {
     spCfg = spConfig;
     central = bShepherd(subMod);
     central.on('IND', shepherdEvtHdlr);
+    central.enableBlackOrWhite(true, 'black');
 
     nc = new Netcore('blecore', central, {phy: 'ble', nwk: 'ble'});
     nc.cookRawDev = cookRawDev;
@@ -69,6 +52,11 @@ var bleNc = function (subModule, spConfig) {
 /*************************************************************************************************/
 /*** Initialize Definitions                                                                    ***/
 /*************************************************************************************************/
+_.forEach(bipso.ipsoCharUuid._enumMap, function (uuid, cls) {
+    ipsoDefs[cls] = [ uuid ];
+    nspUuids.bipso.push(uuid);
+});
+
 _.forEach(uuidDefs, function (uuidSet, nsp) {
     _.forEach(uuidSet, function (uuids) {
         nspUuids[nsp] = nspUuids[nsp].concat(uuids);
@@ -79,7 +67,6 @@ _.forEach(uuidDefs, function (uuidSet, nsp) {
             ipsoDefs[name] = ipsoDefs[name].concat(uuidSet[name]);
     });
 });
-
 /*************************************************************************************************/
 /*** Shepherd Event Handlers                                                                   ***/
 /*************************************************************************************************/
@@ -89,6 +76,7 @@ function shepherdEvtHdlr (msg) {
         manuName,
         chars = {},
         charId,
+        charVal,
         charData = {};
 
     switch (msg.type) {
@@ -103,9 +91,7 @@ function shepherdEvtHdlr (msg) {
             });
 
             commitGads(data, chars, nspUuids.public);
-
-            if (manuName === 'sivann') 
-                commitGads(data, chars, nspUuids.sivann);
+            commitGads(data, chars, nspUuids.bipso);
 
             if (manuName === 'Texas Instruments')
                 commitGads(data, chars, nspUuids.ti);
@@ -119,16 +105,17 @@ function shepherdEvtHdlr (msg) {
         case 'ATT_IND':
             dev = central.find(data.addr);
             charId = data.charUuid;
+            charVal = _.merge({}, data.value);
             manuName = dev.findChar('0x180a', '0x2a29').val.manufacturerName;
 
             if (data.servUuid === '0x180a') {
                 // device attributes reporting
                 if (charId === '0x2a29') {
-                    nc.commitDevReporting(data.addr, {manufacturer: data.value});
+                    nc.commitDevReporting(data.addr, {manufacturer: charVal});
                 } else if (charId === '0x2a24') {
-                    nc.commitDevReporting(data.addr, {model: data.value});
+                    nc.commitDevReporting(data.addr, {model: charVal});
                 } else if (charId === '0x2a25') {
-                    nc.commitDevReporting(data.addr, {serial: data.value});
+                    nc.commitDevReporting(data.addr, {serial: charVal});
                 } else if (charId === '0x2a26' || charId === '0x2a27' || charId === '0x2a28') {
                     charData.fw = dev.findChar('0x180a', charId).val.firmwareRev;
                     charData.hw = dev.findChar('0x180a', charId).val.hardwareRev;
@@ -138,11 +125,11 @@ function shepherdEvtHdlr (msg) {
             } else {
                 // gadget attributes reporting
                 if (_.includes(nspUuids.public, charId)) {
-                    nc.commitGadReporting(data.addr, data.servUuid + '.' + charId, data.value);
-                } else if (manuName === 'sivann' && _.includes(nspUuids.sivann, charId)) {
-                    nc.commitGadReporting(data.addr, data.servUuid + '.' + charId, data.value);
+                    nc.commitGadReporting(data.addr, data.servUuid + '.' + charId, charVal);
+                } else if (_.includes(nspUuids.bipso, charId)) {
+                    nc.commitGadReporting(data.addr, data.servUuid + '.' + charId, charVal);
                 } else if (manuName === 'Texas Instruments' && _.includes(nspUuids.ti, charId)) {
-                    nc.commitGadReporting(data.addr, data.servUuid + '.' + charId, data.value);
+                    nc.commitGadReporting(data.addr, data.servUuid + '.' + charId, charVal);
                 }
             }
             break;
@@ -382,23 +369,15 @@ gadDrvs.setReportCfg = function (permAddr, auxId, attrName, cfg, callback) {
         if (rptCfgInfo.cfg.pmin) {
             pmin = rptCfgInfo.cfg.pmin;
             rptCfgInfo.min = setTimeout(function () {
-                gadDrvs.read(permAddr, auxId, attrName, function (err, val) {
-                    var data = {};
-                    _.set(data, attrName, val);
-                    nc.commitGadReporting(permAddr, auxId, data);
-                });
-            }, pmin);
+                gadDrvs.read(permAddr, auxId, attrName);
+            }, pmin * 1000);
         } else {
             pmin = 0;
         }
 
         if (rptCfgInfo.cfg.pmax) {
             rptCfgInfo.max = setInterval(function () {
-                gadDrvs.read(permAddr, auxId, attrName, function (err, val) {
-                    var data = {};
-                    _.set(data, attrName, val);
-                    nc.commitGadReporting(permAddr, auxId, data);
-                });
+                gadDrvs.read(permAddr, auxId, attrName);
 
                 if (!_.isNil(rptCfgInfo.min))
                     clearTimeout(rptCfgInfo.min);
@@ -406,13 +385,9 @@ gadDrvs.setReportCfg = function (permAddr, auxId, attrName, cfg, callback) {
                 rptCfgInfo.min = null;
 
                 rptCfgInfo.min = setTimeout(function () {
-                    gadDrvs.read(permAddr, auxId, attrName, function (err, val) {
-                        var data = {};
-                        _.set(data, attrName, val);
-                        nc.commitGadReporting(permAddr, auxId, data);
-                    });
-                }, pmin);
-            }, (rptCfgInfo.cfg.pmax + pmin));
+                    gadDrvs.read(permAddr, auxId, attrName);
+                }, pmin * 1000);
+            }, (rptCfgInfo.cfg.pmax + pmin) * 1000);
         }
     }
 
@@ -509,6 +484,8 @@ function operateGadAttr (type, permAddr, auxId, attrName, val, callback) {
         cfg = _.get(rptCfgInfo, 'cfg'),
         cb;
 
+    if (!callback) callback = function () {};
+
     if (char.val[attrName] === undefined) {
         callback(new Error('attrName: ' + attrName + ' not exist.'));
     } else {
@@ -519,23 +496,25 @@ function operateGadAttr (type, permAddr, auxId, attrName, val, callback) {
             if (err) {
                 callback(err);
             } else {
-                if (rptCfgInfo && cfg && cfg.enable && _.isNumber(oldVal)) {
-                    if (_.isNumber(cfg.gt) && _.isNumber(cfg.lt) && cfg.lt > cfg.gt) {
-                        rpt = (oldVal !== currVal) && (currVal > cfg.gt) && (currVal < cfg.lt);
-                    } else {
-                        rpt = _.isNumber(cfg.gt) && (oldVal !== currVal) && (currVal > cfg.gt);
-                        rpt = rpt || (_.isNumber(cfg.lt) && (oldVal !== currVal) && (currVal < cfg.lt));
-                    }
+                // if (rptCfgInfo && cfg && cfg.enable && _.isNumber(oldVal)) {
+                //     if (_.isNumber(cfg.gt) && _.isNumber(cfg.lt) && cfg.lt > cfg.gt) {
+                //         rpt = (oldVal !== currVal) && (currVal > cfg.gt) && (currVal < cfg.lt);
+                //     } else {
+                //         rpt = _.isNumber(cfg.gt) && (oldVal !== currVal) && (currVal > cfg.gt);
+                //         rpt = rpt || (_.isNumber(cfg.lt) && (oldVal !== currVal) && (currVal < cfg.lt));
+                //     }
 
-                    if (_.isNumber(cfg.step)) {
-                        rpt = rpt || (Math.abs(currVal - oldVal) > cfg.step);
-                    }
+                //     if (_.isNumber(cfg.step)) {
+                //         rpt = rpt || (Math.abs(currVal - oldVal) > cfg.step);
+                //     }
 
-                    if (rpt) {
-                        _.set(data, attrName, currVal);
-                        nc.commitGadReporting(permAddr, auxId, data);
-                    }
-                }
+                //     if (rpt) {
+                //         _.set(data, attrName, currVal);
+                //         nc.commitGadReporting(permAddr, auxId, data);
+                //     }
+                // }
+                _.set(data, attrName, currVal);
+                nc.commitGadReporting(permAddr, auxId, data);
                 callback(null, char.val[attrName]);
             }
         };

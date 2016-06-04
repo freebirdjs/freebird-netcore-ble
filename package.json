@@ -7,12 +7,13 @@
     "test": "test"
   },
   "dependencies": {
-    "ble-shepherd": "^0.1.0",
+    "bipso": "0.0.2",
+    "ble-shepherd": "^0.1.1",
     "freebird-base": "^0.1.1",
     "lodash": "^4.11.2"
   },
   "devDependencies": {
-    "freebird": "0.0.8",
+    "freebird": "0.0.9",
     "freebird-websocket": "0.0.4",
     "should": "^8.3.1"
   },
