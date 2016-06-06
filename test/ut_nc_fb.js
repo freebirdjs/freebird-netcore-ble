@@ -255,10 +255,11 @@ describe('Sybsys: Net Functional Test - ', function () {
         });
     });
 
-
+    this.timeout(10000);
     it('unban()', function (done) {
-        wsClient.once('statusChanged', function (msg) {
-            done();
+        wsClient.on('statusChanged', function (msg) {
+            if (msg.data.status === 'online')
+                done();
         });
         wsClient.sendReq('net', 'unban', { ncName : 'blecore', permAddr: remotrCtrl.net.address.permanent }, function (err, msg) {
             if (err)
@@ -275,29 +276,34 @@ describe('Sybsys: Net Functional Test - ', function () {
         });
     });
 
-    // this.timeout(10000);
-    // it('reset()', function (done) {
-    //     var rspCount = 0;
+    this.timeout(10000);
+    it('reset()', function (done) {
+        var rspCount = 0;
 
-    //     wsClient.once('stopped', function (msg) {
-    //         if (msg.data.netcore === 'blecore')
-    //             rspCount += 1;
-    //     });
-    //     wsClient.once('started', function (msg) {
-    //         if (msg.data.netcore === 'blecore' && rspCount === 2)
-    //             done();
-    //     });
-    //     wsClient.sendReq('net', 'reset', { ncName : 'blecore' }, function (err, msg) {
-    //         if (err)
-    //             console.log(err);
-    //         else
-    //             rspCount += 1;
-    //     });
-    // });
+        wsClient.once('stopped', function (msg) {
+            if (msg.data.netcore === 'blecore')
+                rspCount += 1;
+        });
+        wsClient.once('started', function (msg) {
+            if (msg.data.netcore === 'blecore' && rspCount === 2)
+                done();
+        });
+        wsClient.sendReq('net', 'reset', { ncName : 'blecore' }, function (err, msg) {
+            if (err)
+                console.log(err);
+            else
+                rspCount += 1;
+        });
+    });
 
-    // it('ping()', function (done) {
-        // [TODO] ble-netcore not implement yet
-    // });
+    it('ping()', function (done) {
+        wsClient.sendReq('net', 'ping', { id : remotrCtrl.id }, function (err, msg) {
+            if (err)
+                console.log(err);
+            else
+                done();
+        });
+    });
 
     // it('maintain()', function (done) {
         // [TODO] fb not implement yet
@@ -342,7 +348,6 @@ describe('Sybsys: Dev Functional Test - ', function () {
 
     it('read()', function (done) {
         wsClient.sendReq('dev', 'read', { id: remotrCtrl.id, attrName: 'manufacturer' }, function (err, msg) {
-            console.log(msg);
             if (err)
                 console.log(err);
             else if (msg.data.value === remotrCtrl.attrs.manufacturer)
@@ -413,7 +418,6 @@ describe('Sybsys: Gad Functional Test - ', function () {
 
     it('read()', function (done) {
         wsClient.sendReq('gad', 'read', { id: acceler.id, attrName: 'xValue' }, function (err, msg) {
-            console.log(msg);
             if (err)
                 console.log(err);
             else if (msg.data.value === 0)
@@ -446,13 +450,33 @@ describe('Sybsys: Gad Functional Test - ', function () {
         });
     });
 
-    it('setReportCfg()', function (done) {
-        var reportCfg = {
+    it('setProps()', function (done) {
+        wsClient.on('propsChanged', function (msg) {
+            if (msg.data.name === 'accelermeter')
+                done();
+        });
+
+        wsClient.sendReq('gad', 'setProps', { id: acceler.id, props: { name: 'accelermeter' } }, function (err, msg) {
+            if (err)
+                console.log(err);
+        });
+    });
+
+    it('getProps()', function (done) {
+        wsClient.sendReq('gad', 'getProps', { id: acceler.id, propNames : [ 'name' ] }, function (err, msg) {
+            if (err)
+                console.log(err);
+            else if (msg.data.props.name === 'accelermeter')
+                done();
+        });
+    });
+
+    var reportCfg = {
             enable: true,
             pmin: 3,
             pmax: 6
         };
-
+    it('setReportCfg()', function (done) {
         wsClient.sendReq('gad', 'setReportCfg', { id: acceler.id, attrName: 'xValue', rptCfg: reportCfg }, function (err, msg) {
             if (err)
                 console.log(err);
@@ -463,18 +487,11 @@ describe('Sybsys: Gad Functional Test - ', function () {
 
     this.timeout(60000);
     it('getReportCfg()', function (done) {
-        wsClient.on('attrsReport', function (msg) {
-            console.log(msg);
+        wsClient.sendReq('gad', 'getReportCfg', { id: acceler.id, attrName: 'xValue' }, function (err, msg) {
+            if (_.isEqual(msg.data.cfg, reportCfg))
+                done();
         });
     });
-
-    // it('getProps()', function (done) {
-
-    // });
-
-    // it('getProps()', function (done) {
-
-    // });
 });
 
 wsClient.stop();

@@ -75,9 +75,11 @@ function shepherdEvtHdlr (msg) {
         dev,
         manuName,
         chars = {},
+        char,
         charId,
         charVal,
-        charData = {};
+        charData = {},
+        reportFunc;
 
     switch (msg.type) {
         case 'DEV_INCOMING':
@@ -105,6 +107,7 @@ function shepherdEvtHdlr (msg) {
         case 'ATT_IND':
             dev = central.find(data.addr);
             charId = data.charUuid;
+            char = dev.findChar(data.servUuid, charId);
             charVal = _.merge({}, data.value);
             manuName = dev.findChar('0x180a', '0x2a29').val.manufacturerName;
 
@@ -123,13 +126,19 @@ function shepherdEvtHdlr (msg) {
                     nc.commitDevReporting(data.addr, {version: charData});
                 }
             } else {
+                // nc.dangerouslyCommitGadReporting
                 // gadget attributes reporting
+                if (_.includes(char.prop, 'read'))
+                    reportFunc = nc.commitGadReporting.bind(nc);
+                else 
+                    reportFunc = nc.dangerouslyCommitGadReporting.bind(nc);
+
                 if (_.includes(nspUuids.public, charId)) {
-                    nc.commitGadReporting(data.addr, data.servUuid + '.' + charId, charVal);
+                    reportFunc(data.addr, data.servUuid + '.' + charId, charVal);
                 } else if (_.includes(nspUuids.bipso, charId)) {
-                    nc.commitGadReporting(data.addr, data.servUuid + '.' + charId, charVal);
+                    reportFunc(data.addr, data.servUuid + '.' + charId, charVal);
                 } else if (manuName === 'Texas Instruments' && _.includes(nspUuids.ti, charId)) {
-                    nc.commitGadReporting(data.addr, data.servUuid + '.' + charId, charVal);
+                    reportFunc(data.addr, data.servUuid + '.' + charId, charVal);
                 }
             }
             break;
@@ -263,9 +272,20 @@ netDrvs.remove = function (permAddr, callback) {
     });
 };
 
-// TODO, result?
 netDrvs.ping = function (permAddr, callback) {
+    var dev = central.find(permAddr),
+        oldTime = Date.now();
 
+    dev.read('0x180a', '0x2a24', function (err, val) {
+        var time;
+        if (err) {
+            callback(err);
+        } else {
+            time = Date.now() - oldTime;
+            callback(null, time);
+        }
+
+    });
 };
 
 //option
@@ -392,6 +412,7 @@ gadDrvs.setReportCfg = function (permAddr, auxId, attrName, cfg, callback) {
     }
 
     rptCfgInfo.enable = enable;
+    rptCfgInfo.cfg.enable = enable;
     _.set(reportCfgTable, [permAddr, auxId, attrName], rptCfgInfo);
 
     callback(null, true);
