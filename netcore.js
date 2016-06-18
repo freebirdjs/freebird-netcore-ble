@@ -126,7 +126,6 @@ function shepherdEvtHdlr (msg) {
                     nc.commitDevReporting(data.addr, {version: charData});
                 }
             } else {
-                // nc.dangerouslyCommitGadReporting
                 // gadget attributes reporting
                 if (_.includes(char.prop, 'read'))
                     reportFunc = nc.commitGadReporting.bind(nc);
@@ -194,7 +193,7 @@ function cookRawGad (gad, raw, cb) {
 
     gad.setPanelInfo({
         profile: raw._ownerServ.name, 
-        class: cls
+        classId: cls
     });
 
     gad.setAttrs(_.merge({}, raw.val));
