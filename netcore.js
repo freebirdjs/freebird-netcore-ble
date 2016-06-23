@@ -8,6 +8,9 @@ var _ = require('lodash'),
     bipso = require('bipso');
 
 var uuidDefs = JSON.parse(fs.readFileSync(__dirname + '/defs/defs.json'));
+
+// [TEST] for app testing
+var bWhitelist = require('brocas-whitelist');
     
 var nc,
     central,
@@ -36,7 +39,7 @@ var bleNc = function (subModule, spConfig) {
     spCfg = spConfig;
     central = bShepherd(subMod);
     central.on('IND', shepherdEvtHdlr);
-    central.enableBlackOrWhite(true, 'black');
+    central.blocker(true, 'black');
 
     nc = new Netcore('blecore', central, {phy: 'ble', nwk: 'ble'});
     nc.cookRawDev = cookRawDev;
@@ -45,6 +48,9 @@ var bleNc = function (subModule, spConfig) {
     nc.registerNetDrivers(netDrvs);
     nc.registerDevDrivers(devDrvs);
     nc.registerGadDrivers(gadDrvs);
+
+    // [TEST] for app testing
+    bWhitelist(central);
 
     return nc;
 };
@@ -83,20 +89,20 @@ function shepherdEvtHdlr (msg) {
 
     switch (msg.type) {
         case 'DEV_INCOMING':
-            dev = central.find(data);
+            dev = data;
 
             manuName = dev.findChar('0x180a', '0x2a29').val.manufacturerName;
-            nc.commitDevIncoming(data, dev);
+            nc.commitDevIncoming(dev.addr, dev);
 
             _.forEach(dev.servs, function (serv) {
                 chars = _.merge(chars, serv.chars);
             });
 
-            commitGads(data, chars, nspUuids.public);
-            commitGads(data, chars, nspUuids.bipso);
+            commitGads(dev.addr, chars, nspUuids.public);
+            commitGads(dev.addr, chars, nspUuids.bipso);
 
             if (manuName === 'Texas Instruments')
-                commitGads(data, chars, nspUuids.ti);
+                commitGads(dev.addr, chars, nspUuids.ti);
             
             break;
 
