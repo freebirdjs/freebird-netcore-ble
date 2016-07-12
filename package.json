@@ -1,6 +1,6 @@
 {
   "name": "freebird-netcore-ble",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "",
   "main": "netcore.js",
   "directories": {
@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "bipso": "0.0.2",
-    "ble-shepherd": "^0.1.9",
+    "ble-shepherd": "^0.1.10",
     "brocas-whitelist": "0.0.1",
     "freebird-base": "^0.1.8",
     "lodash": "^4.11.2"
