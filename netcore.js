@@ -222,12 +222,12 @@ netDrvs.start = function (callback) {
         };
 
     if (central._enable === true) {
-        callback(null);
+        cb(null);
     } else {
         if (subMod === 'cc-bnp')
-            central.start(app, spCfg, callback);
+            central.start(app, spCfg, cb);
         else if (subMod === 'noble') 
-            central.start(app, callback);
+            central.start(app, cb);
     }
 };
 
