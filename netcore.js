@@ -289,31 +289,16 @@ netDrvs.ping = function (permAddr, callback) {
             time = Date.now() - oldTime;
             callback(null, time);
         }
-
     });
 };
 
 //option
 netDrvs.ban = function (permAddr, callback) {
-    var dev = central.find(permAddr);
-
-    dev.remove(function (err) {
-        if (err)
-            callback(err);
-        else {
-            try {
-                central.toBlack(permAddr);
-                callback(null, permAddr);
-            } catch (e) {
-                callback(e);
-            }
-        }
-    });
+    central.ban(permAddr, callback);
 };
 
 netDrvs.unban = function (permAddr, callback) {
-        central.cancelToBlack(permAddr);
-        callback(null, permAddr);
+    central.unban(permAddr, callback);
 };
 
 /*************************************************************************************************/
