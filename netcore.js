@@ -11,6 +11,8 @@ var uuidDefs = JSON.parse(fs.readFileSync(__dirname + '/defs/defs.json'));
 
 // [TEST] for app testing
 var bWhitelist = require('brocas-whitelist');
+
+var onlineDevs = [];
     
 var nc,
     central,
@@ -50,7 +52,7 @@ var bleNc = function (subModule, spConfig) {
     nc.registerGadDrivers(gadDrvs);
 
     // [TEST] for app testing
-    bWhitelist(central);
+    // bWhitelist(central);
 
     return nc;
 };
@@ -80,7 +82,6 @@ function shepherdEvtHdlr (msg) {
     var data = msg.data,
         dev,
         manuName,
-        chars = {},
         char,
         charId,
         charVal,
@@ -91,26 +92,24 @@ function shepherdEvtHdlr (msg) {
         case 'DEV_INCOMING':
             dev = data;
 
-            manuName = dev.findChar('0x180a', '0x2a29').val.manufacturerName;
-            nc.commitDevIncoming(dev.addr, dev);
-
-            _.forEach(dev.servs, function (serv) {
-                chars = _.merge(chars, serv.chars);
-            });
-
-            commitGads(dev.addr, chars, nspUuids.public);
-            commitGads(dev.addr, chars, nspUuids.bipso);
-
-            if (manuName === 'Texas Instruments')
-                commitGads(dev.addr, chars, nspUuids.ti);
+            if (nc.isEnabled())
+                commitDevs([dev]);
+            else
+                onlineDevs.push(dev);
             
             break;
 
         case 'DEV_LEAVING':
+            if (!nc.isEnabled())
+                    return;
+
             nc.commitDevLeaving(data);
             break;
 
         case 'ATT_IND':
+            if (!nc.isEnabled())
+                return;
+
             dev = central.find(data.addr);
             charId = data.charUuid;
             char = dev.findChar(data.servUuid, charId);
@@ -217,6 +216,9 @@ netDrvs.start = function (callback) {
                 callback(err);
             else {
                 nc.commitReady();
+                setTimeout(function () {
+                    commitDevs(onlineDevs);
+                }, 30);
                 callback(null);
             }
         };
@@ -243,7 +245,7 @@ netDrvs.reset = function (mode, callback) {
         else {
             setTimeout(function () {
                 nc.commitReady();
-            }, 10);
+            }, 50);
             callback(null);
         } 
     });
@@ -420,6 +422,26 @@ gadDrvs.getReportCfg = function (permAddr, auxId, attrName, callback) {
 /*************************************************************************************************/
 /*** Private Functions                                                                         ***/
 /*************************************************************************************************/
+function commitDevs (devs) {
+    _.forEach(devs, function (dev) {
+        var manuName,
+            chars = [];
+
+        manuName = dev.findChar('0x180a', '0x2a29').val.manufacturerName;
+        nc.commitDevIncoming(dev.addr, dev);
+
+        _.forEach(dev.servs, function (serv) {
+            chars = _.merge(chars, serv.chars);
+        });
+
+        commitGads(dev.addr, chars, nspUuids.public);
+        commitGads(dev.addr, chars, nspUuids.bipso);
+
+        if (manuName === 'Texas Instruments')
+            commitGads(dev.addr, chars, nspUuids.ti);
+    });
+}
+
 function commitGads (permAddr, chars, uuids) {
     _.forEach(chars, function (char) {
         var servUuid = char._ownerServ.uuid;
