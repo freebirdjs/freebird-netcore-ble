@@ -52,7 +52,7 @@ var bleNc = function (subModule, spConfig) {
     nc.registerGadDrivers(gadDrvs);
 
     // [TEST] for app testing
-    // bWhitelist(central);
+    bWhitelist(central);
 
     return nc;
 };
