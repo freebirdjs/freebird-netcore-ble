@@ -425,7 +425,7 @@ gadDrvs.getReportCfg = function (permAddr, auxId, attrName, callback) {
 function commitDevs (devs) {
     _.forEach(devs, function (dev) {
         var manuName,
-            chars = [];
+            chars = {};
 
         manuName = dev.findChar('0x180a', '0x2a29').val.manufacturerName;
         nc.commitDevIncoming(dev.addr, dev);
