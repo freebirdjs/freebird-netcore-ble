@@ -17,6 +17,7 @@ var onlineDevs = [];
 var nc,
     central,
     subMod,
+    app,
     spCfg,
     netDrvs = {},
     devDrvs = {},
@@ -38,9 +39,12 @@ var bleNc = function (subModule, spConfig) {
         throw new Error('spConfig must be given with cc-bnp sub module');
 
     subMod = subModule;
-    spCfg = spConfig;
+    spCfg = spConfig ? spConfig : { path: 'xxx' };
+    app = function () {
+        central.on('IND', shepherdEvtHdlr);
+    };
+
     central = bShepherd(subMod);
-    central.on('IND', shepherdEvtHdlr);
     central.blocker(true, 'black');
 
     nc = new Netcore('blecore', central, {phy: 'ble', nwk: 'ble'});
@@ -160,20 +164,20 @@ function cookRawDev (dev, raw, cb) {
             address: { permanent: raw.addr, dynamic: raw.connHdl },
         },
         attrs = {
-            manufacturer: raw.servs['0x180a'].chars['0x2a29'].val.manufacturerName,
-            model: raw.servs['0x180a'].chars['0x2a24'].val.modelNum,
-            serial: raw.servs['0x180a'].chars['0x2a25'].val.serialNum,
+            manufacturer: raw.findChar('0x180a', '0x2a29').val.manufacturerName,
+            model: raw.findChar('0x180a', '0x2a24').val.modelNum,
+            serial: raw.findChar('0x180a', '0x2a25').val.serialNum,
             version: {
-                fw: raw.servs['0x180a'].chars['0x2a26'].val.firmwareRev,
-                hw: raw.servs['0x180a'].chars['0x2a27'].val.hardwareRev,
-                sw: raw.servs['0x180a'].chars['0x2a28'].val.softwareRev,
+                fw: raw.findChar('0x180a', '0x2a26').val.firmwareRev,
+                hw: raw.findChar('0x180a', '0x2a27').val.hardwareRev,
+                sw: raw.findChar('0x180a', '0x2a28').val.softwareRev,
             }
         };
 
-    if (subMod === 'cc-bnp')
+    // if (subMod === 'cc-bnp')
         netInfo.parent = central.bleCentral.addr;
-    else 
-        netInfo.parent = central.bleCentral;
+/*    else 
+        netInfo.parent = central.bleCentral;*/
 
     dev.setNetInfo(netInfo);
     dev.setAttrs(attrs);
@@ -186,10 +190,10 @@ function cookRawGad (gad, raw, cb) {
         profile,
         newVal = {};
 
-    if (raw._ownerServ.name)
-        profile = raw._ownerServ.name;
+    if (raw._service.name)
+        profile = raw._service.name;
     else 
-        profile = raw._ownerServ.uuid;
+        profile = raw._service.uuid;
 
     _.forEach(ipsoDefs, function (uuids, name) {
         if (_.includes(uuids, raw.uuid))
@@ -197,7 +201,7 @@ function cookRawGad (gad, raw, cb) {
     });
 
     gad.setPanelInfo({
-        profile: raw._ownerServ.name, 
+        profile: raw._service.name, 
         classId: cls
     });
 
@@ -210,15 +214,15 @@ function cookRawGad (gad, raw, cb) {
 /*** Netcore drivers                                                                           ***/
 /*************************************************************************************************/
 netDrvs.start = function (callback) {
-    var app = function () {},
-        cb = function (err, result) {
+    var cb = function (err, result) {
             if (err)
                 callback(err);
             else {
                 nc.commitReady();
                 setTimeout(function () {
                     commitDevs(onlineDevs);
-                }, 30);
+                    onlineDevs = [];
+                }, 10);
                 callback(null);
             }
         };
@@ -226,10 +230,7 @@ netDrvs.start = function (callback) {
     if (central._enable === true) {
         cb(null);
     } else {
-        if (subMod === 'cc-bnp')
-            central.start(app, spCfg, cb);
-        else if (subMod === 'noble') 
-            central.start(app, cb);
+        central.start(app, spCfg, cb);
     }
 };
 
@@ -243,9 +244,7 @@ netDrvs.reset = function (mode, callback) {
         if (err)
             callback(err);
         else {
-            setTimeout(function () {
-                nc.commitReady();
-            }, 50);
+            nc.commitReady();
             callback(null);
         } 
     });
@@ -444,7 +443,7 @@ function commitDevs (devs) {
 
 function commitGads (permAddr, chars, uuids) {
     _.forEach(chars, function (char) {
-        var servUuid = char._ownerServ.uuid;
+        var servUuid = char._service.uuid;
 
         if (_.includes(uuids, char.uuid)) 
             nc.commitGadIncoming(permAddr, servUuid + '.' + char.uuid, char);
@@ -475,7 +474,7 @@ function operateDevAttr (type, permAddr, attrName, val, callback) {
     } else {
         _.forEach(infos, function (info) {
             readFuncs.push(function (cb) {
-                var char = dev.servs['0x180a'].chars[info.char],
+                var char = dev.findChar('0x180a', info.char),
                     execCb = function (err, result) {
                         if (err) {
                             cb(err);

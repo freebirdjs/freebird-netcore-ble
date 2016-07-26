@@ -39,10 +39,13 @@ var rawDev = {
                     }
                 }
             }
+        },
+        findChar: function (uuidServ, uuidChar) {
+            return this.servs[uuidServ].chars[uuidChar];
         }
     },
     rawGad = {
-        _ownerServ: {name: 'sensor'},
+        _service: {name: 'sensor'},
         uuid: '0xcc07',
         val: {
             flags: 0,
@@ -54,7 +57,7 @@ var dev = new Device(nc, rawDev),
     gad = new Gadget(dev, '0xcc00.0xcc07', rawGad);
 
 describe('Netcore Drivers Check', function () {
-    this.timeout(5000);
+    this.timeout(10000);
     it('start()', function (done) {
         nc.start(function (err) {
             if (err) {
@@ -87,13 +90,15 @@ describe('Netcore Drivers Check', function () {
 
     it('reset()', function (done) {
         // done();
-        nc.reset(function (err) {
-            if (err) {
-                console.log(err);
-            } else {
-                done();
-            }
-        });
+        setTimeout(function () {
+            nc.reset(function (err) {
+                if (err) {
+                    console.log(err);
+                } else {
+                    done();
+                }
+            });
+        }, 50);
     });
 
     it('permitJoin()', function (done) {
@@ -110,7 +115,7 @@ describe('Netcore Drivers Check', function () {
         var addr,
             devIncomeHdlr = function (msg) {
                 if (msg.type === 'DEV_INCOMING') {
-                    addr = msg.data;
+                    addr = msg.data.addr;
 
                     nc._controller.on('IND', devLeaveHdlr);
                     nc.remove(addr, function (err) {
@@ -129,8 +134,24 @@ describe('Netcore Drivers Check', function () {
         nc._controller.on('IND', devIncomeHdlr);    
     });
 
-    it('ping()',function () {
-        // TODO
+    it('ping()',function (done) {
+        var devIncomeHdlr = function (msg) {
+                if (msg.type === 'DEV_INCOMING') {
+                    addr = msg.data.addr;
+
+                    nc.ping(addr, function (err, time) {
+                        if (err)
+                            console.log(err);
+                        else {
+                            nc._controller.removeListener('IND', devIncomeHdlr);
+                            done();
+                        }
+                    });
+                }
+            };
+        
+
+        nc._controller.on('IND', devIncomeHdlr);  
     });
     
     it('ban()', function (done) {
@@ -182,7 +203,7 @@ describe('Cook Functional Check', function() {
         nc.cookRawGad(gad, rawGad, function (err, cooked) {
             var panelInfo = {
                     profile: 'sensor',
-                    class: 'temperature'
+                    classId: 'temperature'
                 },
                 attrInfo = {
                     flags: 0,
@@ -192,6 +213,7 @@ describe('Cook Functional Check', function() {
             if (err) {
                 console.log(err);
             } else {
+                panelInfo.enabled = false;
                 if (_.isMatch(cooked._panel, panelInfo) &&
                     _.isMatch(cooked._attrs , attrInfo))
                     done();
@@ -203,11 +225,11 @@ describe('Cook Functional Check', function() {
 describe('Device Drivers Check', function () {
     var permAddr = '0x544a165e1f53';
 
-    this.timeout(10000);
+    this.timeout(20000);
     it('connect to keyfob', function (done) {
         nc._controller.on('IND', function (msg) {
             if (msg.type === 'DEV_INCOMING') {
-                if (msg.data === permAddr)
+                if (msg.data.addr === permAddr)
                     done();
             }
         }); 
@@ -251,14 +273,14 @@ describe('Gadget Drivers Check', function () {
     });
 
     it('write()', function (done) {
-        nc.gadWrite(permAddr, '0x1800.0x2a02', 'flag', true, function (err, result) {
+        nc.gadWrite(permAddr, '0x1803.0x2a06', 'alertLevel', 1, function (err, result) {
             if (err) {
                 console.log(err);
             } else {
-                nc.gadRead(permAddr, '0x1800.0x2a02', 'flag', function (err, result) {
+                nc.gadRead(permAddr, '0x1803.0x2a06', 'alertLevel', function (err, result) {
                     if (err) {
                         console.log(err);
-                    } else if (result === true) {
+                    } else if (result === 1) {
                         done();
                     }
                 });
