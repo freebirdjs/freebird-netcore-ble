@@ -118,7 +118,7 @@ function shepherdEvtHdlr (msg) {
             charId = data.charUuid;
             char = dev.findChar(data.servUuid, charId);
             charVal = _.merge({}, data.value);
-            manuName = dev.findChar('0x180a', '0x2a29').val.manufacturerName;
+            // manuName = dev.findChar('0x180a', '0x2a29').val.manufacturerName;
 
             if (data.servUuid === '0x180a') {
                 // device attributes reporting
@@ -145,9 +145,9 @@ function shepherdEvtHdlr (msg) {
                     reportFunc(data.addr, data.servUuid + '.' + charId, charVal);
                 } else if (_.includes(nspUuids.bipso, charId)) {
                     reportFunc(data.addr, data.servUuid + '.' + charId, charVal);
-                } else if (manuName === 'Texas Instruments' && _.includes(nspUuids.ti, charId)) {
+                }/* else if (manuName === 'Texas Instruments' && _.includes(nspUuids.ti, charId)) {
                     reportFunc(data.addr, data.servUuid + '.' + charId, charVal);
-                }
+                }*/
             }
             break;
     }
