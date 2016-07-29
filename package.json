@@ -1,6 +1,6 @@
 {
   "name": "freebird-netcore-ble",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Freebird netcore of ble",
   "main": "index.js",
   "directories": {
@@ -8,10 +8,10 @@
   },
   "dependencies": {
     "bipso": "0.0.2",
-    "ble-shepherd": "^0.2.5",
+    "ble-shepherd": "^0.2.6",
     "brocas-whitelist": "0.0.1",
     "busyman": "^0.1.2",
-    "freebird-base": "^0.2.3"
+    "freebird-base": "^0.2.4"
   },
   "devDependencies": {
     "chai": "^3.5.0",
@@ -22,7 +22,7 @@
     "sinon": "^1.17.5"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "make test-all"
   },
   "repository": {
     "type": "git",

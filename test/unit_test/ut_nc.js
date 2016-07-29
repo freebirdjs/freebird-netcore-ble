@@ -1,7 +1,7 @@
 var should = require('should'),
     _ = require('lodash'),
-    nc = require('../index')('noble'),
-    // nc = require('../index')('cc-bnp', {path: '/dev/ttyACM0'}),
+    nc = require('../../index')('noble'),
+    // nc = require('../../index')('cc-bnp', {path: '/dev/ttyACM0'}),
     Netcore = require('freebird-base').Netcore,
     Device = require('freebird-base').Device,
     Gadget = require('freebird-base').Gadget;

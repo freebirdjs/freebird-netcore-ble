@@ -68,6 +68,12 @@ var controller = nc._controller,
     dev = new Device(nc, rawDev),
     gad = new Gadget(dev, '0xcc00.0xcc07', rawGad);
 
+var invokeCbNextTick = function (cb) {
+        process.nextTick(function () {
+            cb(null);
+        });
+};
+
 describe('Cook Functional Check', function() {
     it('cookRawDev()', function (done) {
         nc.cookRawDev(dev, rawDev, function (err, cooked) {
@@ -126,12 +132,10 @@ describe('Cook Functional Check', function() {
 
 describe('Netcore Drivers Check', function () {
     it('start()', function (done) {
-        var startStub = sinon.stub(controller, 'start', function (app, cfg, callback) {
+        var startStub = sinon.stub(controller, 'start', function (callback) {
                 controller._enable = true;
-                controller.app();
-                callback(null);
-            }),
-            args = [ controller.app, controller._spCfg ];
+                invokeCbNextTick(callback);
+            });
 
         nc.start(function (err) {
             if (err) {
@@ -139,8 +143,7 @@ describe('Netcore Drivers Check', function () {
             } else {
                 startStub.firstCall.args.pop();
 
-                if (startStub.calledOnce &&
-                    _.isEqual(startStub.firstCall.args, args)) {
+                if (startStub.calledOnce) {
                     startStub.restore();
                     done();
                 }                    
@@ -164,9 +167,24 @@ describe('Netcore Drivers Check', function () {
         });
     });
 
+    it('start() - restart', function (done) {
+        var startStub = sinon.stub(controller, 'start', function () {});
+
+        nc.start(function (err) {
+            if (err) {
+                console.log(err);
+            } else {
+                if (!startStub.called) {
+                    startStub.restore();
+                    done();
+                }                    
+            }
+        });
+    });
+
     it('reset()', function (done) {
         var resetStub = sinon.stub(controller, 'reset', function (callback) {
-                callback(null);
+                invokeCbNextTick(callback);
             }),
             cb = function (err) {
                 if (err) {
@@ -202,12 +220,12 @@ describe('Netcore Drivers Check', function () {
     });
 
     it('remove()', function (done) {
-        nc.enable();
+        // nc.enable();
         var findStub = sinon.stub(controller, 'find', function () {
                 return rawDev;
             }),
             periphRmvStub = sinon.stub(rawDev, 'remove', function (callback) {
-                callback(null);
+                invokeCbNextTick(callback);
             });
 
         nc.remove(rawDev.addr, function (err, result) {
@@ -474,48 +492,50 @@ describe('Gadget Drivers Check', function () {
             if (_.isEqual(result, cfg1)) done();
         });
     });
-    // this.timeout(5000);
-    // it('setReportCfg()', function (done) {
-    //     var enable,
-    //         findStub = sinon.stub(controller, 'find', function () {
-    //             return rawDev;
-    //         }),
-    //         devNotifyStub = sinon.stub(rawDev, 'setNotify', function () {}),
-    //         devReadStub = sinon.stub(rawDev, 'read', function () {});
 
-    //     setTimeout(function () {
-    //         devReadStub.firstCall.args.pop();
-    //         devReadStub.secondCall.args.pop();
+    this.timeout(5000);
+    it('setReportCfg()', function (done) {
+        var enable,
+            findStub = sinon.stub(controller, 'find', function () {
+                return rawDev;
+            }),
+            devNotifyStub = sinon.stub(rawDev, 'setNotify', function () {}),
+            devReadStub = sinon.stub(rawDev, 'read', function () {});
 
-    //         if (enable === true &&
-    //             findStub.called &&
-    //             _.isEqual(findStub.firstCall.args, [ rawDev.addr ]) &&
-    //             devNotifyStub.calledOnce &&
-    //             _.isEqual(devNotifyStub.firstCall.args, [ '0xcc00', '0xcc07', true ]) &&
-    //             devReadStub.callCount === 2 && 
-    //             _.isEqual(devReadStub.firstCall.args, [ '0xcc00', '0xcc07' ]) &&
-    //             _.isEqual(devReadStub.secondCall.args, [ '0xcc00', '0xcc07' ])) {
-    //             findStub.restore();
-    //             devNotifyStub.restore();
-    //             devReadStub.restore();
-    //             done();
-    //         }
-    //     }, 3100);
+        setTimeout(function () {
+            devReadStub.firstCall.args.pop();
+            devReadStub.secondCall.args.pop();
+
+            if (enable === true &&
+                findStub.called &&
+                _.isEqual(findStub.firstCall.args, [ rawDev.addr ]) &&
+                devNotifyStub.calledOnce &&
+                _.isEqual(devNotifyStub.firstCall.args, [ '0xcc00', '0xcc07', true ]) &&
+                devReadStub.callCount === 2 && 
+                _.isEqual(devReadStub.firstCall.args, [ '0xcc00', '0xcc07' ]) &&
+                _.isEqual(devReadStub.secondCall.args, [ '0xcc00', '0xcc07' ])) {
+                findStub.restore();
+                devNotifyStub.restore();
+                devReadStub.restore();
+                done();
+            }
+        }, 3100);
 
 
-    //     nc.setReportCfg(rawDev.addr, '0xcc00.0xcc07', 'sensorValue', cfg2, function (err, result) {
-    //         if (err)
-    //             console.log(err);
-    //         else
-    //             enable = result;
-    //     });
-    // });
+        nc.setReportCfg(rawDev.addr, '0xcc00.0xcc07', 'sensorValue', cfg2, function (err, result) {
+            if (err)
+                console.log(err);
+            else
+                enable = result;
+        });
+    });
 
-    // it('getReportCfg()', function (done) {
-    //     nc.getReportCfg(rawDev.addr, '0xcc00.0xcc07', 'sensorValue', function (err, result) {
-    //         if (_.isEqual(result, cfg2)) done();
-    //     });
-    // });
+    this.timeout(2000);
+    it('getReportCfg()', function (done) {
+        nc.getReportCfg(rawDev.addr, '0xcc00.0xcc07', 'sensorValue', function (err, result) {
+            if (_.isEqual(result, cfg2)) done();
+        });
+    });
 });
 
 describe('Controller Handlers Check', function () {
@@ -549,9 +569,93 @@ describe('Controller Handlers Check', function () {
         }
     });
 
-    it('devNotifyHdlr()', function (done) {
-        var ncCmtDevNotifStub = sinon.stub(nc, 'commitDevReporting', function () {});
+    it('devNotifyHdlr() - device attribute', function (done) {
+        var attIndMsg = {
+                type: 'ATT_IND',
+                data: {
+                    addr: rawDev.addr,
+                    servUuid: '0x180a',
+                    charUuid: '0x2a29',
+                    value: { manufacturerName: 'sivann' }
+                }
+            },
+            findStub = sinon.stub(controller, 'find', function () {
+                return rawDev;
+            }),
+            ncCmtDevNotifStub = sinon.stub(nc, 'commitDevReporting', function () {});
 
-        
+        controller.emit('IND', attIndMsg);
+
+        if (findStub.calledOnce &&
+            findStub.firstCall.args, [ rawDev.addr ] &&
+            ncCmtDevNotifStub.calledOnce &&
+            _.isEqual(ncCmtDevNotifStub.firstCall.args, [ rawDev.addr, { manufacturer: 'sivann' } ])) {
+            findStub.restore();
+            ncCmtDevNotifStub.restore();
+            done();
+        }
+    });
+
+    it('devNotifyHdlr() - gadget attribute(dangerous)', function (done) {
+        var attIndMsg = {
+                type: 'ATT_IND',
+                data: {
+                    addr: rawDev.addr,
+                    servUuid: '0xcc00',
+                    charUuid: '0xcc07',
+                    value: {
+                        id: 0,
+                        flags: 0,
+                        sensorValue: 26.5
+                    }
+                }
+            },
+            findStub = sinon.stub(controller, 'find', function () {
+                return rawDev;
+            }),
+            ncCmtGadNotifStub = sinon.stub(nc, 'dangerouslyCommitGadReporting', function () {});
+
+        controller.emit('IND', attIndMsg);
+
+        if (findStub.calledOnce &&
+            findStub.firstCall.args, [ rawDev.addr ] &&
+            ncCmtGadNotifStub.calledOnce &&
+            _.isEqual(ncCmtGadNotifStub.firstCall.args, [ rawDev.addr, '0xcc00.0xcc07', attIndMsg.data.value ])) {
+            findStub.restore();
+            ncCmtGadNotifStub.restore();
+            done();
+        }
+    });
+
+    it('devNotifyHdlr() - gadget attribute', function (done) {
+        var attIndMsg = {
+                type: 'ATT_IND',
+                data: {
+                    addr: rawDev.addr,
+                    servUuid: '0xcc00',
+                    charUuid: '0xcc07',
+                    value: {
+                        id: 0,
+                        flags: 0,
+                        sensorValue: 26.5
+                    }
+                }
+            },
+            findStub = sinon.stub(controller, 'find', function () {
+                return rawDev;
+            }),
+            ncCmtGadNotifStub = sinon.stub(nc, 'commitGadReporting', function () {});
+
+        rawGad.prop = ['read'];
+        controller.emit('IND', attIndMsg);
+
+        if (findStub.calledOnce &&
+            findStub.firstCall.args, [ rawDev.addr ] &&
+            ncCmtGadNotifStub.calledOnce &&
+            _.isEqual(ncCmtGadNotifStub.firstCall.args, [ rawDev.addr, '0xcc00.0xcc07', attIndMsg.data.value ])) {
+            findStub.restore();
+            ncCmtGadNotifStub.restore();
+            done();
+        }
     });
 });
