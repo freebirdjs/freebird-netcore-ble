@@ -2,7 +2,7 @@ var sinon = require('sinon'),
     expect = require('chai').expect,
     _ = require('lodash');
 
-var nc = require('../index')('noble'),
+var nc = require('../index')('cc-bnp', { path: 'xxx' }),
     Netcore = require('freebird-base').Netcore,
     Device = require('freebird-base').Device,
     Gadget = require('freebird-base').Gadget;
