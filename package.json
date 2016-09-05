@@ -7,10 +7,10 @@
     "test": "test"
   },
   "dependencies": {
-    "bipso": "0.0.2",
-    "ble-shepherd": "^0.2.6",
+    "bipso": "^1.2.0",
+    "ble-shepherd": "^1.0.2",
     "brocas-whitelist": "0.0.1",
-    "busyman": "^0.1.2",
+    "busyman": "^0.2.1",
     "freebird-base": "^0.2.4"
   },
   "devDependencies": {
