@@ -9,57 +9,80 @@ var nc = require('../index')('cc-bnp', { path: 'xxx' }),
 
 var RawDev = require('../node_modules/ble-shepherd/lib/model/peripheral'),
     RawGad = require('../node_modules/ble-shepherd/lib/model/characteristic'),
-    rawDev = new RawDev({ addr: '0x544a165e1f53', connHdl: 5 }),
-    rawGad = new RawGad({ uuid: '0xcc07' }, { name: 'sensor', _peripheral: { _controller: null } });
+    rawDev = new RawDev({ addr: '0x544a165e1f53', connHandle: 5 }),
+    rawGad = new RawGad({ uuid: '0xcc07', handle: 28, prop: ['notif'] }, { name: 'sensor', _peripheral: { _controller: null } });
 
 rawDev.servs = { 
     '0x180a': {
+        uuid: '0x180a',
         chars: {
             '1': {
                 _service: { uuid: '0x180a' },
                 uuid: '0x2a23',
-                val: {"manufacturerID":"0x00005e1f53","organizationallyUID":"0x544a16"}
+                value: {"manufacturerID":"0x00005e1f53","organizationallyUID":"0x544a16"},
+                dump: function () {
+                    return { uuid: this.uuid, value: this.value };
+                }
             },
             '5': {
                 _service: { uuid: '0x180a' },
                 uuid: '0x2a24',
-                val: {"modelNum":"Model Number"}
+                value: {"modelNum":"Model Number"},
+                dump: function () {
+                    return { uuid: this.uuid, value: this.value };
+                }
             },
             '8': {
                 _service: { uuid: '0x180a' },
                 uuid: '0x2a25',
-                val: {"serialNum":"Serial Number"}
+                value: {"serialNum":"Serial Number"},
+                dump: function () {
+                    return { uuid: this.uuid, value: this.value };
+                }
             },
             '12': {
                 _service: { uuid: '0x180a' },
                 uuid: '0x2a26',
-                val: {"firmwareRev":"Firmware Revision"}
+                value: {"firmwareRev":"Firmware Revision"},
+                dump: function () {
+                    return { uuid: this.uuid, value: this.value };
+                }
             },
             '16': {
                 _service: { uuid: '0x180a' },
                 uuid: '0x2a27',
-                val: {"hardwareRev":"Hardware Revision"}
+                value: {"hardwareRev":"Hardware Revision"},
+                dump: function () {
+                    return { uuid: this.uuid, value: this.value };
+                }
             },
             '19': {
                 _service: { uuid: '0x180a' },
                 uuid: '0x2a28',
-                val: {"softwareRev":"Software Revision"}
+                value: {"softwareRev":"Software Revision"},
+                dump: function () {
+                    return { uuid: this.uuid, value: this.value };
+                }
             },
             '24': {
                 _service: { uuid: '0x180a' },
                 uuid: '0x2a29',
-                val: {"manufacturerName":"Manufacturer Name"}
+                value: {"manufacturerName":"Manufacturer Name"},
+                dump: function () {
+                    return { uuid: this.uuid, value: this.value };
+                }
             }
         }
     },
     '0xcc00': {
+        uuid: '0xcc00',
         chars: {
             '28': rawGad
         }
     }
 };
 rawGad._service.uuid = '0xcc00';
-rawGad.val = {
+rawGad.value = {
     flags: 0,
     sensorValue: 25
 };
@@ -190,6 +213,8 @@ describe('Netcore Drivers Check', function () {
                 if (err) {
                     console.log(err);
                 } else {
+                    controller.emit('ready');
+
                     if (resetStub.calledOnce &&
                         resetStub.firstCall.args, [ cb ])
                         resetStub.restore();
@@ -202,7 +227,9 @@ describe('Netcore Drivers Check', function () {
 
     it('permitJoin()', function (done) {
         var duration = 50,
-            permitJoinStub = sinon.stub(controller, 'permitJoin', function () {});
+            permitJoinStub = sinon.stub(controller, 'permitJoin', function () {
+                controller.emit('permitJoining', duration);
+            });
 
         nc.permitJoin(duration, function (err, result) {
             if (err) 
@@ -224,7 +251,7 @@ describe('Netcore Drivers Check', function () {
         var findStub = sinon.stub(controller, 'find', function () {
                 return rawDev;
             }),
-            periphRmvStub = sinon.stub(rawDev, 'remove', function (callback) {
+            periphRmvStub = sinon.stub(controller, 'remove', function (addr, callback) {
                 invokeCbNextTick(callback);
             });
 
@@ -274,7 +301,7 @@ describe('Netcore Drivers Check', function () {
     });
     
     it('ban()', function (done) {
-        var banStub = sinon.stub(controller, 'ban', function (permAddr, cb) {
+        var banStub = sinon.stub(controller.blocker, 'block', function (permAddr, cb) {
                 cb(null);
             });
 
@@ -295,7 +322,7 @@ describe('Netcore Drivers Check', function () {
     });
 
     it('unban()', function (done) {
-        var unbanStub = sinon.stub(controller, 'unban', function (permAddr, cb) {
+        var unbanStub = sinon.stub(controller.blocker, 'unblock', function (permAddr, cb) {
                 cb(null);
             });
 
@@ -322,7 +349,7 @@ describe('Device Drivers Check', function () {
                 return rawDev;
             }),
             devReadStub = sinon.stub(rawDev, 'read', function (uuidServ, uuidChar, cb) {
-                cb(null, rawDev.findChar('0x180a', '0x2a25').val.serialNum);
+                cb(null, rawDev.findChar('0x180a', '0x2a25').value.serialNum);
             });
         
         nc.devRead(rawDev.addr, 'serial', function (err, result) {
@@ -331,7 +358,7 @@ describe('Device Drivers Check', function () {
             else {
                 devReadStub.firstCall.args.pop();
 
-                if (_.isEqual(result, rawDev.findChar('0x180a', '0x2a25').val.serialNum) &&
+                if (_.isEqual(result, rawDev.findChar('0x180a', '0x2a25').value.serialNum) &&
                     findStub.calledOnce &&
                     _.isEqual(findStub.firstCall.args, [ rawDev.addr ]) &&
                     devReadStub.calledOnce && 
@@ -396,20 +423,20 @@ describe('Gadget Drivers Check', function () {
                 return rawDev;
             }),
             gadReadStub = sinon.stub(rawDev, 'read', function (uuidServ, uuidChar, cb) {
-                cb(null, rawDev.findChar('0xcc00', '0xcc07').val.sensorValue);
+                cb(null, rawDev.findChar('0xcc00', '0xcc07').value.sensorValue);
             });
 
-        nc.gadRead(rawDev.addr, '0xcc00.0xcc07', 'sensorValue', function (err, result) {
+        nc.gadRead(rawDev.addr, '0xcc00.0xcc07.28', 'sensorValue', function (err, result) {
             if (err) {
                 console.log(err);
             } else {
                 gadReadStub.firstCall.args.pop();
 
-                if (_.isEqual(result, rawDev.findChar('0xcc00', '0xcc07').val.sensorValue) &&
+                if (_.isEqual(result, rawDev.findChar('0xcc00', '0xcc07').value.sensorValue) &&
                     findStub.calledOnce &&
                     _.isEqual(findStub.firstCall.args, [ rawDev.addr ]) &&
                     gadReadStub.calledOnce &&
-                    _.isEqual(gadReadStub.firstCall.args, [ '0xcc00', '0xcc07' ])) {
+                    _.isEqual(gadReadStub.firstCall.args, [ '0xcc00', 28 ])) {
                     findStub.restore();
                     gadReadStub.restore();
                     done();
@@ -427,7 +454,7 @@ describe('Gadget Drivers Check', function () {
                 cb(null, val);
             });
         
-        nc.gadWrite(rawDev.addr, '0xcc00.0xcc07', 'sensorValue', writeVal, function (err, result) {
+        nc.gadWrite(rawDev.addr, '0xcc00.0xcc07.28', 'sensorValue', writeVal, function (err, result) {
             if (err)
                 console.log(err);
             else {
@@ -437,7 +464,7 @@ describe('Gadget Drivers Check', function () {
                     findStub.calledOnce &&
                     _.isEqual(findStub.firstCall.args, [ rawDev.addr ]) &&
                     gadWriteStub.calledOnce && 
-                    _.isEqual(gadWriteStub.firstCall.args, [ '0xcc00', '0xcc07', { flags: 0, sensorValue: writeVal } ])) {
+                    _.isEqual(gadWriteStub.firstCall.args, [ '0xcc00', 28, { flags: 0, sensorValue: writeVal } ])) {
                     findStub.restore();
                     gadWriteStub.restore();
                     done();
@@ -468,9 +495,9 @@ describe('Gadget Drivers Check', function () {
         var findStub = sinon.stub(controller, 'find', function () {
                 return rawDev;
             }),
-            devNotifyStub = sinon.stub(rawDev, 'setNotify', function () {});
+            devNotifyStub = sinon.stub(rawDev, 'configNotify', function () {});
 
-        nc.setReportCfg(rawDev.addr, '0xcc00.0xcc07', 'sensorValue', cfg1, function (err, result) {
+        nc.setReportCfg(rawDev.addr, '0xcc00.0xcc07.28', 'sensorValue', cfg1, function (err, result) {
             if (err)
                 console.log(err);
             else {
@@ -478,7 +505,7 @@ describe('Gadget Drivers Check', function () {
                     findStub.calledOnce &&
                     findStub.firstCall.args, [ rawDev.addr ] &&
                     devNotifyStub.calledOnce &&
-                    _.isEqual(devNotifyStub.firstCall.args, [ '0xcc00', '0xcc07', false ])) {
+                    _.isEqual(devNotifyStub.firstCall.args, [ '0xcc00', 28, false ])) {
                     findStub.restore();
                     devNotifyStub.restore();
                     done();
@@ -488,7 +515,7 @@ describe('Gadget Drivers Check', function () {
     });
 
     it('getReportCfg()', function (done) {
-        nc.getReportCfg(rawDev.addr, '0xcc00.0xcc07', 'sensorValue', function (err, result) {
+        nc.getReportCfg(rawDev.addr, '0xcc00.0xcc07.28', 'sensorValue', function (err, result) {
             if (_.isEqual(result, cfg1)) done();
         });
     });
@@ -499,7 +526,7 @@ describe('Gadget Drivers Check', function () {
             findStub = sinon.stub(controller, 'find', function () {
                 return rawDev;
             }),
-            devNotifyStub = sinon.stub(rawDev, 'setNotify', function () {}),
+            devNotifyStub = sinon.stub(rawDev, 'configNotify', function () {}),
             devReadStub = sinon.stub(rawDev, 'read', function () {});
 
         setTimeout(function () {
@@ -510,19 +537,28 @@ describe('Gadget Drivers Check', function () {
                 findStub.called &&
                 _.isEqual(findStub.firstCall.args, [ rawDev.addr ]) &&
                 devNotifyStub.calledOnce &&
-                _.isEqual(devNotifyStub.firstCall.args, [ '0xcc00', '0xcc07', true ]) &&
+                _.isEqual(devNotifyStub.firstCall.args, [ '0xcc00', 28, true ]) &&
                 devReadStub.callCount === 2 && 
-                _.isEqual(devReadStub.firstCall.args, [ '0xcc00', '0xcc07' ]) &&
-                _.isEqual(devReadStub.secondCall.args, [ '0xcc00', '0xcc07' ])) {
-                findStub.restore();
-                devNotifyStub.restore();
-                devReadStub.restore();
-                done();
+                _.isEqual(devReadStub.firstCall.args, [ '0xcc00', 28 ]) &&
+                _.isEqual(devReadStub.secondCall.args, [ '0xcc00', 28 ])) {
+
+                nc.setReportCfg(rawDev.addr, '0xcc00.0xcc07.28', 'sensorValue', { enable: false }, function (err, result) {
+                    if (err) {
+                        console.log(err);
+                    } else {
+                        findStub.restore();
+                        devNotifyStub.restore();
+                        devReadStub.restore();
+                        enable = result;
+                        done();
+                    }
+                });
+                
             }
         }, 3100);
 
 
-        nc.setReportCfg(rawDev.addr, '0xcc00.0xcc07', 'sensorValue', cfg2, function (err, result) {
+        nc.setReportCfg(rawDev.addr, '0xcc00.0xcc07.28', 'sensorValue', cfg2, function (err, result) {
             if (err)
                 console.log(err);
             else
@@ -532,7 +568,7 @@ describe('Gadget Drivers Check', function () {
 
     this.timeout(2000);
     it('getReportCfg()', function (done) {
-        nc.getReportCfg(rawDev.addr, '0xcc00.0xcc07', 'sensorValue', function (err, result) {
+        nc.getReportCfg(rawDev.addr, '0xcc00.0xcc07.28', 'sensorValue', function (err, result) {
             if (_.isEqual(result, cfg2)) done();
         });
     });
@@ -543,13 +579,13 @@ describe('Controller Handlers Check', function () {
         var ncCmtDevInStub = sinon.stub(nc, 'commitDevIncoming', function () {}),
             ncCmtGadInStub = sinon.stub(nc, 'commitGadIncoming', function () {});
 
-        controller.emit('IND', { type: 'DEV_INCOMING', data: rawDev});
+        controller.emit('ind', { type: 'devIncoming', periph: rawDev});
 
 
         if (ncCmtDevInStub.calledOnce &&
             _.isEqual(ncCmtDevInStub.firstCall.args, [ rawDev.addr, rawDev ]) &&
             ncCmtGadInStub.calledOnce &&
-            _.isEqual(ncCmtGadInStub.firstCall.args, [ rawDev.addr, '0xcc00.0xcc07', rawDev.findChar('0xcc00', '0xcc07') ])) {
+            _.isEqual(ncCmtGadInStub.firstCall.args, [ rawDev.addr, '0xcc00.0xcc07.28', rawDev.findChar('0xcc00', '0xcc07') ])) {
 
             ncCmtDevInStub.restore();
             ncCmtGadInStub.restore();
@@ -560,7 +596,7 @@ describe('Controller Handlers Check', function () {
     it('devLeavingHdlr()', function (done) {
         var ncCmtDevOutStub = sinon.stub(nc, 'commitDevLeaving', function () {});
 
-        controller.emit('IND', { type: 'DEV_LEAVING', data: rawDev.addr});
+        controller.emit('ind', { type: 'devLeaving', periph: rawDev.addr, data: rawDev.addr});
 
         if (ncCmtDevOutStub.calledOnce &&
             _.isEqual(ncCmtDevOutStub.firstCall.args, [ rawDev.addr ])) {
@@ -571,26 +607,26 @@ describe('Controller Handlers Check', function () {
 
     it('devNotifyHdlr() - device attribute', function (done) {
         var attIndMsg = {
-                type: 'ATT_IND',
+                type: 'attNotify',
+                periph: rawDev,
                 data: {
-                    addr: rawDev.addr,
-                    servUuid: '0x180a',
-                    charUuid: '0x2a29',
+                    sid: {
+                        uuid: '0x180a',
+                        handle: 6
+                    },
+                    cid: {
+                        uuid: '0x2a29',
+                        handle: 24
+                    },
                     value: { manufacturerName: 'sivann' }
                 }
             },
-            findStub = sinon.stub(controller, 'find', function () {
-                return rawDev;
-            }),
             ncCmtDevNotifStub = sinon.stub(nc, 'commitDevReporting', function () {});
 
-        controller.emit('IND', attIndMsg);
+        controller.emit('ind', attIndMsg);
 
-        if (findStub.calledOnce &&
-            findStub.firstCall.args, [ rawDev.addr ] &&
-            ncCmtDevNotifStub.calledOnce &&
+        if (ncCmtDevNotifStub.calledOnce &&
             _.isEqual(ncCmtDevNotifStub.firstCall.args, [ rawDev.addr, { manufacturer: 'sivann' } ])) {
-            findStub.restore();
             ncCmtDevNotifStub.restore();
             done();
         }
@@ -598,11 +634,17 @@ describe('Controller Handlers Check', function () {
 
     it('devNotifyHdlr() - gadget attribute(dangerous)', function (done) {
         var attIndMsg = {
-                type: 'ATT_IND',
+                type: 'attChange',
+                periph: rawDev,
                 data: {
-                    addr: rawDev.addr,
-                    servUuid: '0xcc00',
-                    charUuid: '0xcc07',
+                    sid: {
+                        uuid: '0xcc00',
+                        handle: 25
+                    },
+                    cid: {
+                        uuid: '0xcc07',
+                        handle: 28
+                    },
                     value: {
                         id: 0,
                         flags: 0,
@@ -610,18 +652,12 @@ describe('Controller Handlers Check', function () {
                     }
                 }
             },
-            findStub = sinon.stub(controller, 'find', function () {
-                return rawDev;
-            }),
             ncCmtGadNotifStub = sinon.stub(nc, 'dangerouslyCommitGadReporting', function () {});
 
-        controller.emit('IND', attIndMsg);
+        controller.emit('ind', attIndMsg);
 
-        if (findStub.calledOnce &&
-            findStub.firstCall.args, [ rawDev.addr ] &&
-            ncCmtGadNotifStub.calledOnce &&
-            _.isEqual(ncCmtGadNotifStub.firstCall.args, [ rawDev.addr, '0xcc00.0xcc07', attIndMsg.data.value ])) {
-            findStub.restore();
+        if (ncCmtGadNotifStub.calledOnce &&
+            _.isEqual(ncCmtGadNotifStub.firstCall.args, [ rawDev.addr, '0xcc00.0xcc07.28', attIndMsg.data.value ])) {
             ncCmtGadNotifStub.restore();
             done();
         }
@@ -629,11 +665,17 @@ describe('Controller Handlers Check', function () {
 
     it('devNotifyHdlr() - gadget attribute', function (done) {
         var attIndMsg = {
-                type: 'ATT_IND',
+                type: 'attNotify',
+                periph: rawDev,
                 data: {
-                    addr: rawDev.addr,
-                    servUuid: '0xcc00',
-                    charUuid: '0xcc07',
+                    sid: {
+                        uuid: '0xcc00',
+                        handle: 25
+                    },
+                    cid: {
+                        uuid: '0xcc07',
+                        handle: 28
+                    },
                     value: {
                         id: 0,
                         flags: 0,
@@ -641,20 +683,31 @@ describe('Controller Handlers Check', function () {
                     }
                 }
             },
-            findStub = sinon.stub(controller, 'find', function () {
-                return rawDev;
-            }),
             ncCmtGadNotifStub = sinon.stub(nc, 'commitGadReporting', function () {});
 
         rawGad.prop = ['read'];
-        controller.emit('IND', attIndMsg);
+        controller.emit('ind', attIndMsg);
 
-        if (findStub.calledOnce &&
-            findStub.firstCall.args, [ rawDev.addr ] &&
-            ncCmtGadNotifStub.calledOnce &&
-            _.isEqual(ncCmtGadNotifStub.firstCall.args, [ rawDev.addr, '0xcc00.0xcc07', attIndMsg.data.value ])) {
-            findStub.restore();
+        if (ncCmtGadNotifStub.calledOnce &&
+            _.isEqual(ncCmtGadNotifStub.firstCall.args, [ rawDev.addr, '0xcc00.0xcc07.28', attIndMsg.data.value ])) {
             ncCmtGadNotifStub.restore();
+            done();
+        }
+    });
+
+    it('devStatusHdlr()', function (done) {
+        var devStatusMsg = {
+                type: 'devStatus',
+                periph: rawDev,
+                data: 'idle'
+            },
+            ncCmtDevStatusStub = sinon.stub(nc, 'commitDevNetChanging', function () {});
+
+        controller.emit('ind', devStatusMsg);
+
+        if (ncCmtDevStatusStub.calledOnce &&
+            _.isEqual(ncCmtDevStatusStub.firstCall.args, [ rawDev.addr, { status: 'idle' } ])) {
+            ncCmtDevStatusStub.restore();
             done();
         }
     });
