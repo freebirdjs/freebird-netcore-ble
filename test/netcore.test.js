@@ -114,8 +114,8 @@ describe('Cook Functional Check', function() {
                         fw: 'Firmware Revision'
                     },
                     power: { 
-                        type: undefined, 
-                        voltage: undefined 
+                        type: '', 
+                        voltage: '' 
                     }
                 };
 
@@ -181,7 +181,7 @@ describe('Netcore Drivers Check', function () {
             if (err) {
                 console.log(err);
             } else {
-                if (permitJoinStub.calledOnce &&
+                if (permitJoinStub.called &&
                     _.isEqual(permitJoinStub.firstCall.args, [ 0 ])) {
                     permitJoinStub.restore();
                     done();
