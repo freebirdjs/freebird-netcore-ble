@@ -1,39 +1,39 @@
 {
     "public": {
         "generic": [
-            "0x2A72",
-            "0x2A35",
-            "0x2A9C",
-            "0x2AA7",
-            "0x2A5B",
-            "0x2A18",
-            "0x2A37",
-            "0x2A5F",
-            "0x2A5E",
-            "0x2A6D",
-            "0X2A92",
-            "0x2A53",
-            "0x2A98",
-            "0x2A9D",
-            "0x2A8E"
+            "0x2a72",
+            "0x2a35",
+            "0x2a9c",
+            "0x2aa7",
+            "0x2a5b",
+            "0x2a18",
+            "0x2a37",
+            "0x2a5f",
+            "0x2a5e",
+            "0x2a6d",
+            "0X2a92",
+            "0x2a53",
+            "0x2a98",
+            "0x2a9d",
+            "0x2a8e"
         ],
         "temperature": [
-            "0x2A6E",
-            "0x2A1C",
-            "0x2A1E"
+            "0x2a6e",
+            "0x2a1c",
+            "0x2a1e"
         ],
         "humidity": [
-            "0x2A6F"
+            "0x2a6f"
         ],
         "pwrMea": [
-            "0x2A19",
-            "0x2A07",
-            "0x2A63"
+            "0x2a19",
+            "0x2a07",
+            "0x2a63"
         ],
         "magnetometer": [
-            "0x2A2C",
-            "0x2AA0",
-            "0x2AA1"
+            "0x2a2c",
+            "0x2aa0",
+            "0x2aa1"
         ]
     },
     "ti": {

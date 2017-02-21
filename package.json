@@ -7,20 +7,17 @@
     "test": "test"
   },
   "dependencies": {
-    "bipso": "^1.3.0",
-    "ble-shepherd": "^1.0.3",
-    "brocas-whitelist": "0.0.1",
-    "busyman": "^0.2.1",
-    "freebird-base": "^0.2.6",
+    "bipso": "^1.4.0",
+    "ble-shepherd": "^1.1.4",
+    "busyman": "^0.3.0",
+    "freebird-base": "^0.4.6",
     "proving": "^0.1.0"
   },
   "devDependencies": {
     "chai": "^3.5.0",
-    "freebird": "0.0.10",
-    "freebird-websocket": "0.0.4",
     "mocha": "^2.5.3",
-    "should": "^8.3.1",
-    "sinon": "^1.17.5"
+    "sinon": "^1.17.5",
+    "sinon-chai": "^2.8.0"
   },
   "scripts": {
     "test": "make test-all"
