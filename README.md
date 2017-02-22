@@ -60,14 +60,14 @@ freebird.start(function (err) {
 <a name="APIs"></a>
 ## 4. APIs  
 
-### 1. Basic API
+#### 1. Basic API
 
 **freebird-netcore-ble** exports a function `createBleCore()` to create BLE netcore, it will returns a [Netcore](https://github.com/freebirdjs/freebird-base/blob/master/docs/NetcoreClass.md#netcore-class) instance for network operating
 
 * [createBleCore()](#API_createBleNc)
 
 
-### 2. Netcore APIs  
+#### 2. Netcore APIs  
 
 Netcore provides you with the following APIs, please go to [Netcore APIs](https://github.com/freebirdjs/freebird-base/blob/master/docs/NetcoreClass.md#netcore-class) for their usage.  
 
