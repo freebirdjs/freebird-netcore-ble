@@ -3,9 +3,9 @@ A ble machine network core for freebird framework.
 
 [![NPM](https://nodei.co/npm/freebird-netcore-ble.png?downloads=true)](https://nodei.co/npm/freebird-netcore-ble/)  
 
-[![Travis branch](https://travis-ci.org/freebirdjs/freebird-netcore-ble.svg?branch=master)](https://travis-ci.org/freebirdjs/freebird-netcore-ble)  
-[![npm](https://img.shields.io/npm/v/freebird-netcore-ble.svg?maxAge=2592000)](https://www.npmjs.com/package/freebird-netcore-ble)  
-[![npm](https://img.shields.io/npm/l/freebird-netcore-ble.svg?maxAge=2592000)](https://www.npmjs.com/package/freebird-netcore-ble)  
+[![Travis branch](https://travis-ci.org/freebirdjs/freebird-netcore-ble.svg?branch=master)](https://travis-ci.org/freebirdjs/freebird-netcore-ble)
+[![npm](https://img.shields.io/npm/v/freebird-netcore-ble.svg?maxAge=2592000)](https://www.npmjs.com/package/freebird-netcore-ble)
+[![npm](https://img.shields.io/npm/l/freebird-netcore-ble.svg?maxAge=2592000)](https://www.npmjs.com/package/freebird-netcore-ble)
 
 
 ## Table of Contents  
@@ -60,45 +60,14 @@ freebird.start(function (err) {
 <a name="APIs"></a>
 ## 4. APIs  
 
-### Create Netcore instance  
+### 1. Basic API
 
-**freebird-netcore-ble** exports a function to create BLE netcore, the arguments of the function are shown bellow:  
+**freebird-netcore-ble** exports a function `createBleCore()` to create BLE netcore, it will returns a [Netcore](https://github.com/freebirdjs/freebird-base/blob/master/docs/NetcoreClass.md#netcore-class) instance for network operating
 
-* `subModule` (*String*): `subModule` can be either a string of `'cc-bnp'` or `'noble'` to specify the sub-module.  
-* `spConfig` (*Object*): This value-object has two properties `path` and `options` to configure the serial port.  
+* [createBleCore()](#API_createBleNc)
 
-    * `path`: A string that refers to the serial-port system path, e.g., `'/dev/ttyUSB0'`.  
-    * `options`: An object to set up the [seiralport configuration options](https://www.npmjs.com/package/serialport#serialport-path-options-opencallback).  
 
-Here is a example of how to create a BLE netcore:  
-
-* Using `cc-bnp` as a sub-module:  
-
-```js
-var createBleCore = require('freeebird-netcore-ble');
-
-var bleCore = createBleCore('cc-bnp', {
-        path: '/dev/ttyUSB0',
-        options: {
-            baudRate: 115200,   // default value
-            rtscts: true,       // default value
-            flowControl: true   // default value
-        }
-    });
-```
-
-* Using noble as a sub-module:  
-
-```js
-var createBleCore = require('freeebird-netcore-ble');
-
-var bleCore = createBleCore('noble');
-```
-  
-<br />
-********************************************
-
-### Netcore APIs  
+### 2. Netcore APIs  
 
 Netcore provides you with the following APIs, please go to [Netcore APIs](https://github.com/freebirdjs/freebird-base/blob/master/docs/NetcoreClass.md#netcore-class) for their usage.  
 
@@ -132,3 +101,51 @@ Netcore provides you with the following APIs, please go to [Netcore APIs](https:
 | getBlacklist   | Get blacklist of the banned devices. Use `ban()` to put a device into blacklist.                 |  
 | clearBlacklist | Clear the blacklist. Use `unban()` to release a device from blacklist.                           |  
 | isBlacklisted  | To see if a device is banned.                                                                    |  
+
+
+<br />
+*************************************************  
+<a name="API_createBleNc"></a>  
+### createBleCore(subModule[, spConfig])  
+Create a BLE netcore with `cc-bnp` or `noble` sub-module.  
+
+* With `cc-bnp` sub-module: `createBleCore('cc-bnp', spConfig)`
+* With `noble` sub-module: `createBleCore('noble')`
+
+**Arguments**  
+
+* `subModule` (*String*): `subModule` can be either a string of `'cc-bnp'` or `'noble'` to specify the sub-module.  
+* `spConfig` (*Object*): This value-object has two properties `path` and `options` to configure the serial port.  
+
+    * `path`: A string that refers to the serial-port system path, e.g., `'/dev/ttyUSB0'`.  
+    * `options`: An object to set up the [seiralport configuration options](https://www.npmjs.com/package/serialport#serialport-path-options-opencallback).  
+
+**Returns**  
+
+- (*Object*): bleCore  
+
+**Example**  
+
+* Using `cc-bnp` as a sub-module:  
+
+```js
+var createBleCore = require('freeebird-netcore-ble');
+
+var bleCore = createBleCore('cc-bnp', {
+        path: '/dev/ttyUSB0',
+        options: {
+            baudRate: 115200,   // default value
+            rtscts: true,       // default value
+            flowControl: true   // default value
+        }
+    });
+```
+
+* Using noble as a sub-module:  
+
+```js
+var createBleCore = require('freeebird-netcore-ble');
+
+var bleCore = createBleCore('noble');
+```
+
