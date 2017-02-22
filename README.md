@@ -38,7 +38,7 @@ A ble machine network core for freebird framework.
 
 ```js
 var Freebird = require('freebird'),
-    createBleCore = require('freeebird-netcore-ble');
+    createBleCore = require('freebird-netcore-ble');
 
 var freebird,
     bleCore = createBleCore('noble');

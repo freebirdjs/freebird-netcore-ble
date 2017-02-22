@@ -1,6 +1,6 @@
 {
   "name": "freebird-netcore-ble",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "description": "Freebird netcore of ble",
   "main": "index.js",
   "directories": {
