@@ -48,8 +48,7 @@ freebird = new Freebird([ bleCore ]);
 
 // Simply start the freebird server
 freebird.start(function (err) {
-    var bleCoreName = bleCore.getName();    // 'freebird-netcore-ble'
-    freebird.permitJoin(bleCoreName, 180);  // Let your ble peripheral machines join the network
+    freebird.permitJoin(180);  // Let your netcores allow peripheral machines to join the network
 });
 
 // That's it!
