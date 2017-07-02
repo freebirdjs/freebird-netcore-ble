@@ -376,9 +376,15 @@ describe('Device Drivers Check', function () {
     });
 
     it('read() - attr not exist', function (done) {
+        var findStub = sinon.stub(controller, 'find', function () {
+                return rawDev;
+            });
+
         dev.read('xxx', function (err, result) {
-            if (err && err.message === 'attrName: xxx not exist.') 
+            if (err && err.message === 'attrName: xxx not exist.') {
+                findStub.restore();
                 done();
+            }
         });
     });
 
@@ -411,9 +417,15 @@ describe('Device Drivers Check', function () {
     });
 
     it('write() - attr not exist', function (done) {
+        var findStub = sinon.stub(controller, 'find', function () {
+                return rawDev;
+            });
+
         dev.write('xxx', 'xxxx', function (err, result) {
-            if (err && err.message === 'attrName: xxx not exist.') 
+            if (err && err.message === 'attrName: xxx not exist.') {
+                findStub.restore();
                 done();
+            }
         });
     });
 
